@@ -268,7 +268,8 @@ deploy_red_black () {
             exit 1 
         fi 
     fi 
-    echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} ${no_color}"
+    TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${URL_PORT}"
+    echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     
 ##################
@@ -277,6 +278,14 @@ deploy_red_black () {
 # Check to see what deployment type: 
 #   simple: simply deploy a container and set the inventory 
 #   red_black: deploy new container, assign floating IP address, keep original container 
+if [ -z "$URL_PROTOCOL" ]; then 
+ export URL_PROTOCOL="http://" 
+fi 
+if [ -z "$URL_PORT" ]; then 
+ export URL_PROTOCOL=":80" 
+fi 
+
+
 echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
 if [ "${DEPLOY_TYPE}" == "simple" ]; then
     deploy_simple

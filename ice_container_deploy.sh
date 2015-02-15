@@ -1,5 +1,5 @@
 #!/bin/bash
-
+ 
 #********************************************************************************
 # Copyright 2014 IBM
 #
@@ -28,7 +28,7 @@ usage () {
     echo "IMAGE_NAME"
     echo "CONTAINER_NAME"
 }
-
+ 
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo "Running Containers: "
@@ -37,16 +37,16 @@ dump_info () {
     ice ip list --all
     echo "All floating IP addresses"
     ice ip list --all
-
+ 
     if [[ (-z $IP_LIMIT) || (-z $CONTAINER_LIMIT) ]]; then 
         echo "Expected Container Service Limits to be set on the environment"
         return 1
     fi 
-
+ 
     echo -e "${label_color}Current limitations:${no_color}"
     echo "     # of containers: ${CONTAINER_LIMIT}"
     echo "     # of floating IP addresses: ${IP_LIMIT}"
-
+ 
     WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
     CONTAINER_COUNT=$(ice ps -q | wc -l | sed 's/^ *//') 
     if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then 
@@ -54,13 +54,13 @@ dump_info () {
     elif [ $CONTAINER_COUNT -ge $WARNING_LEVEL ]; then
         echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
     fi 
-
+ 
     IP_COUNT_REQUESTED=$(ice ip list --all | grep "Number" | sed 's/.*: \([0-9]*\).*/\1/')
     IP_COUNT_AVAILABLE=$(ice ip list | grep "Number" | sed 's/.*: \([0-9]*\).*/\1/')
     echo "Number of IP Addresses currently requested: $IP_COUNT_REQUESTED"
     echo "Number of requested IP Addresses that are still available: $IP_COUNT_AVAILABLE"
     AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT_REQUESTED + $IP_COUNT_AVAILABLE" | bc)"
-
+ 
     if [ ${AVAILABLE} -eq 0 ]; then 
         echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
     else
@@ -100,7 +100,7 @@ update_inventory(){
     local temp="${ID%\",}"
     ID="${temp#\"}"
     echo "The ID of the $TYPE is: $ID"
-
+ 
     # find other inventory information 
     echo -e "${label_color}Updating inventory with deployment $NAME of a $TYPE ${no_color}"
     IDS_INV_URL="${IDS_URL%/}"
@@ -127,19 +127,19 @@ update_inventory(){
     else
         echo "spaceID is ${IDS_RESOURCE}"
     fi 
-
+ 
     # call IBM DevOps Service Inventory CLI to update the entry for this deployment
     echo "bash ids-inv -a insert -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ibm_containers -u $IDS_INV_URL -v $IDS_VERSION"
     bash ids-inv -a insert -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ibm_containers -u $IDS_INV_URL -v $IDS_VERSION
 }
-
+ 
 insert_inventory(){
     update_inventory $1 $2 "insert"
 }
 delete_inventory(){
     update_inventory $1 $2 "delete"
 }
-
+ 
 # function to wait for a container to start 
 # takes a container name as the only parameter
 wait_for (){
@@ -161,29 +161,24 @@ wait_for (){
     fi  
     return 0 
 }
-
+ 
 deploy_container() {
     local MY_CONTAINER_NAME=$1 
+    echo "deploying container ${MY_CONTAINER_NAME}"
+
     if [ -z MY_CONTAINER_NAME ];then 
         echo "${red}No container name was provided${no_color}"
         return 1 
     fi 
-
+ 
     # check to see if that container name is already in use 
     ice inspect ${MY_CONTAINER_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then 
-        echo "Removing previous deployment with the same name: ${MY_CONTAINER_NAME}"
-        ice rm ${MY_CONTAINER_NAME}
-        while [ ${FOUND} -eq 0 ]; do
-            ice inspect ${MY_CONTAINER_NAME} > /dev/null
-            FOUND=$?
-            sleep 1
-        done
+        echo -e "${red}${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed${no_color}"
     fi  
-
+ 
     # run the container and check the results
-    echo "deploying container ${MY_CONTAINER_NAME}"
     ice run --name "${MY_CONTAINER_NAME}" ${IMAGE_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
@@ -191,7 +186,7 @@ deploy_container() {
         dump_info
         return 1
     fi 
-
+ 
     # wait for container to start 
     wait_for ${MY_CONTAINER_NAME}
     RESULT=$?
@@ -200,7 +195,7 @@ deploy_container() {
     fi 
     return ${RESULT}
 }
-
+ 
 deploy_simple () {
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_container ${MY_CONTAINER_NAME}
@@ -210,7 +205,7 @@ deploy_simple () {
         exit $RESULT
     fi
 }
-
+ 
 deploy_red_black () {
     echo -e "${label_color}Example red_black container deploy ${no_color}"
     # deploy new version of the application 
@@ -220,7 +215,7 @@ deploy_red_black () {
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
     fi
-
+ 
     COUNTER=${BUILD_NUMBER}
     let COUNTER-=1
     FOUND=0

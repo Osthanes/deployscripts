@@ -268,7 +268,7 @@ deploy_red_black () {
             exit 1 
         fi 
     fi 
-    TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${URL_PORT}"
+    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${URL_PORT}"
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     

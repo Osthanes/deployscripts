@@ -277,7 +277,6 @@ deploy_red_black () {
 # Check to see what deployment type: 
 #   simple: simply deploy a container and set the inventory 
 #   red_black: deploy new container, assign floating IP address, keep original container 
-set -x 
 echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
 if [ "${DEPLOY_TYPE}" == "simple" ]; then
     deploy_simple

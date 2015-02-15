@@ -173,9 +173,13 @@ deploy_container() {
     ice inspect ${MY_CONTAINER_NAME} > /dev/null
     FOUND=$?
     if [ ${FOUND} -eq 0 ]; then 
-        echo -e "${red}${MY_CONTAINER_NAME} already exists.  If you wish to replace it remove it or use the red_black deployer strategy${no_color}"
-        dump_info 
-        return 1
+        ice rm ${MY_CONTAINER_NAME}
+        echo "Removing previous deployment with the same name: ${MY_CONTAINER_NAME}"
+        while [ ${FOUND} -eq 0 ]; do
+            ice inspect ${MY_CONTAINER_NAME} > /dev/null
+            FOUND=$?
+            sleep 1
+        done
     fi  
 
     # run the container and check the results

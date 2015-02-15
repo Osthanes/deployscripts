@@ -184,7 +184,7 @@ deploy_group() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then 
         if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then 
-            ice route bind $ROUTE_HOSTNAME $ROUTE_DOMAIN $MY_GROUP_NAME
+            ice route map $ROUTE_HOSTNAME $ROUTE_DOMAIN $MY_GROUP_NAME
             RESULT=$?
             if [ $RESULT -eq 0 ]; then 
                 insert_inventory "containergroup" ${MY_GROUP_NAME}
@@ -193,7 +193,7 @@ deploy_group() {
                 return 1
             fi 
         else 
-            echo "No route defined, so not bind it to ${MY_GROUP_NAME}"
+            echo "No route defined, so not map it to ${MY_GROUP_NAME}"
         fi 
     else 
         echo -e "${red}Failed to deploy group${no_color}"
@@ -242,7 +242,7 @@ deploy_red_black () {
                 ice group rm ${MY_GROUP_NAME}_${COUNTER}
                 delete_inventory "group" ${MY_GROUP_NAME}_${COUNTER}
             else 
-                echo "No route defined, so not unbinding it from ${MY_GROUP_NAME}_${COUNTER}"
+                echo "No route defined, so not unmapping it from ${MY_GROUP_NAME}_${COUNTER}"
             fi 
         fi 
         let COUNTER-=1

@@ -171,10 +171,10 @@ deploy_container() {
 
     # check to see if that container name is already in use 
     ice inspect ${MY_CONTAINER_NAME} > /dev/null
-    FOUND=$?
+    local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then 
-        ice rm ${MY_CONTAINER_NAME}
         echo "Removing previous deployment with the same name: ${MY_CONTAINER_NAME}"
+        ice rm ${MY_CONTAINER_NAME}
         while [ ${FOUND} -eq 0 ]; do
             ice inspect ${MY_CONTAINER_NAME} > /dev/null
             FOUND=$?
@@ -183,6 +183,7 @@ deploy_container() {
     fi  
 
     # run the container and check the results
+    echo "deploying container ${MY_CONTAINER_NAME}"
     ice run --name "${MY_CONTAINER_NAME}" ${IMAGE_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then

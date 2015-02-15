@@ -14,14 +14,23 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #********************************************************************************
+usage () { 
+    echo -e "${label_color}Usage:${no_color}"
+    echo "Set the following as a parameter on the job, or as an environment variable on the stage"
+    echo "DEPLOY_TYPE: "
+    echo "              simple: simply deploy a container and set the inventory"
+    echo "              red_black: deploy new container, assign floating IP address, keep original container"
+    echo ""
+    
+    echo "The following environement variables can be set on the stage:"
+    echo "DEPLOY_TYPE"
+    echo "API_KEY"
+    echo "IMAGE_NAME"
+    echo "CONTAINER_NAME"
+}
+ 
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
-    echo "Groups: "
-    ice group list
-
-    echo "Routes: "
-    cf routes 
-
     echo "Running Containers: "
     ice ps 
     echo "Available floating IP addresses"
@@ -133,7 +142,7 @@ delete_inventory(){
  
 # function to wait for a container to start 
 # takes a container name as the only parameter
-wait_for_group (){
+wait_for (){
     local WAITING_FOR=$1 
     if [ -z ${WAITING_FOR} ]; then 
         echo "${red}Expected container name to be passed into wait_for${no_color}"
@@ -141,69 +150,55 @@ wait_for_group (){
     fi 
     COUNTER=0
     STATE="unknown"
-    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") ]]; do
+    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Running") ]]; do
         let COUNTER=COUNTER+1 
-        STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g') && echo "${WAITING_FOR} is ${STATE}"
+        STATE=$(ice inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/"//g') && echo "${WAITING_FOR} is ${STATE}"
         sleep 1
     done
-    if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
-        echo -e "${red}Failed to start group ${no_color}"
+    if [ "$STATE" != "Running" ]; then
+        echo -e "${red}Failed to start instance ${no_color}"
         return 1
     fi  
     return 0 
 }
  
-deploy_group() {
-    local MY_GROUP_NAME=$1 
-    echo "deploying group ${MY_GROUP_NAME}"
+deploy_container() {
+    local MY_CONTAINER_NAME=$1 
+    echo "deploying container ${MY_CONTAINER_NAME}"
  
-    if [ -z MY_GROUP_NAME ];then 
+    if [ -z MY_CONTAINER_NAME ];then 
         echo "${red}No container name was provided${no_color}"
         return 1 
     fi 
  
-    # check to see if that group name is already in use 
-    ice group inspect ${MY_GROUP_NAME} > /dev/null
+    # check to see if that container name is already in use 
+    ice inspect ${MY_CONTAINER_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then 
-        echo -e "${red}${MY_GROUP_NAME} already exists.${no_color}"
-        exit 1
+        echo -e "${red}${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed${no_color}"
     fi  
  
-    # create the group and check the results
-    ice group create --name "${MY_GROUP_NAME}" --publish 80 --min ${GROUP_MIN} --max ${GROUP_MAX} --desired ${GROUP_DESIRED} ${IMAGE_NAME}
+    # run the container and check the results
+    ice run --name "${MY_CONTAINER_NAME}" ${IMAGE_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        echo -e "${red}Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}${no_color}"
+        echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
         dump_info
         return 1
     fi 
-
-    # wait for group to start 
-    wait_for_group ${MY_GROUP_NAME}
+ 
+    # wait for container to start 
+    wait_for ${MY_CONTAINER_NAME}
     RESULT=$?
     if [ $RESULT -eq 0 ]; then 
-        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then 
-            ice route map $ROUTE_HOSTNAME $ROUTE_DOMAIN $MY_GROUP_NAME
-            RESULT=$?
-            if [ $RESULT -eq 0 ]; then 
-                insert_inventory "containergroup" ${MY_GROUP_NAME}
-            else
-                echo -e "${red}Failed to map $ROUTE_HOSTNAME $ROUTE_DOMAIN to $MY_GROUP_NAME ${no_color}"
-                return 1
-            fi 
-        else 
-            echo "No route defined, so not map it to ${MY_GROUP_NAME}"
-        fi 
-    else 
-        echo -e "${red}Failed to deploy group${no_color}"
+        insert_inventory "container" ${MY_CONTAINER_NAME}
     fi 
     return ${RESULT}
 }
  
 deploy_simple () {
-    local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
-    deploy_container ${MY_GROUP_NAME}
+    local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
+    deploy_container ${MY_CONTAINER_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}${no_color}"
@@ -214,8 +209,8 @@ deploy_simple () {
 deploy_red_black () {
     echo -e "${label_color}Example red_black container deploy ${no_color}"
     # deploy new version of the application 
-    local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
-    deploy_group ${MY_GROUP_NAME}
+    local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
+    deploy_container ${MY_CONTAINER_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
@@ -225,28 +220,59 @@ deploy_red_black () {
     let COUNTER-=1
     FOUND=0
     until [  $COUNTER -lt 1 ]; do
-        ice group inspect ${MY_GROUP_NAME}_${COUNTER} > inspect.log 
+        ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            echo "Found previous container ${MY_GROUP_NAME}_${COUNTER}"
+            echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
+            # does it have a public IP address 
+            FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
+            temp="${FLOATING_IP%\"}"
+            FLOATING_IP="${temp#\"}"
             if [ $FOUND -eq 0 ]; then 
-                # this is the previous version so keep it around 
-                echo "keeping previous deployment: ${MY_GROUP_NAME}_${COUNTER}"
+                # this is the first previous deployment I have found
+                if [ -z "${FLOATING_IP}" ]; then 
+                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so allocating one"
+                else 
+                    echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
+                    ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER}
+                    ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
+                    echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
+                fi 
                 FOUND=1
-            elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
-                #statements
-                # remove this group 
-                echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${MY_GROUP_NAME}_${COUNTER}" 
-                ice route unmap $ROUTE_HOSTNAME $ROUTE_DOMAIN $MY_GROUP_NAME
-                echo "removing group ${MY_GROUP_NAME}_${COUNTER}"
-                ice group rm ${MY_GROUP_NAME}_${COUNTER}
-                delete_inventory "group" ${MY_GROUP_NAME}_${COUNTER}
             else 
-                echo "No route defined, so not unmapping it from ${MY_GROUP_NAME}_${COUNTER}"
-            fi 
+                # remove
+                echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
+                ice rm ${CONTAINER_NAME}_${COUNTER}
+                delete_inventory "container" ${CONTAINER_NAME}_${COUNTER}
+            fi  
         fi 
         let COUNTER-=1
     done
+    # check to see that I obtained a floating IP address
+    ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log 
+    FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
+    if [ "${FLOATING_IP}" = '""' ]; then 
+        echo "Requesting IP"
+        FLOATING_IP=$(ice ip request | awk '{print $4}')
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            echo -e "${red}Failed to allocate IP address ${no_color}" 
+            exit 1 
+        fi
+        temp="${FLOATING_IP%\"}"
+        FLOATING_IP="${temp#\"}"
+        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}" 
+            echo "Unsetting TEST_URL"
+            export TEST_URL=""
+            exit 1 
+        fi 
+        echo "Exporting TEST_URL:${TEST_URL}"
+        export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${URL_PORT}"
+    fi 
+    echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     
 ##################
@@ -255,26 +281,15 @@ deploy_red_black () {
 # Check to see what deployment type: 
 #   simple: simply deploy a container and set the inventory 
 #   red_black: deploy new container, assign floating IP address, keep original container 
+if [ -z "$URL_PROTOCOL" ]; then 
+ export URL_PROTOCOL="http://" 
+fi 
+if [ -z "$URL_PORT" ]; then 
+ export $URL_PORT=":80" 
+fi 
+ 
+ 
 echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
-if [ -z "$GROUP_MIN" ]; then 
- export GROUP_MIN=1
-fi 
-if [ -z "$GROUP_MAX" ]; then 
- export GROUP_MAX=2
-fi 
-if [ -z "$GROUP_DESIRED" ]; then 
-  export GROUP_DESIRED=1 
-fi 
-
-if [ -z "$ROUTE_HOSTNAME" ]; then 
-    echo -e "${red}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment proeprties on the stage.${no_color}"
-    exit 1 
-fi 
-if [ -z "$ROUTE_DOMAIN" ]; then 
-    echo -e "${label_color}ROUTE_DOMAIN not set, defaulting to mybluemix.net${no_color}"
-    export ROUTE_DOMAIN="mybluemix.net"
-fi 
-
 if [ "${DEPLOY_TYPE}" == "simple" ]; then
     deploy_simple
 elif [ "${DEPLOY_TYPE}" == "simple_public" ]; then 
@@ -286,6 +301,5 @@ else
     usage
     deploy_red_black
 fi 
-ice groups list 
 ice ps 
 dump_info

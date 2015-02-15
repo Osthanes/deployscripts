@@ -265,9 +265,11 @@ deploy_red_black () {
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}" 
+            echo "Unsetting TEST_URL"
             export TEST_URL=""
             exit 1 
         fi 
+        echo "Exporting TEST_URL:${TEST_URL}"
         export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${URL_PORT}"
     fi 
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"

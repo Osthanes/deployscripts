@@ -130,7 +130,7 @@ update_inventory(){
  
     # call IBM DevOps Service Inventory CLI to update the entry for this deployment
     echo "bash ids-inv -a insert -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ibm_containers -u $IDS_INV_URL -v $IDS_VERSION"
-    bash ids-inv -a insert -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ibm_containers -u $IDS_INV_URL -v $IDS_VERSION
+    bash ids-inv -a $ACTION -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ibm_containers -u $IDS_INV_URL -v $IDS_VERSION
 }
  
 insert_inventory(){

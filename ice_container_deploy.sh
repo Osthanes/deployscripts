@@ -285,7 +285,7 @@ if [ -z "$URL_PROTOCOL" ]; then
  export URL_PROTOCOL="http://" 
 fi 
 if [ -z "$URL_PORT" ]; then 
- export $URL_PORT=":80" 
+ export URL_PORT=':80' 
 fi 
  
  

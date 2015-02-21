@@ -234,7 +234,10 @@ deploy_red_black () {
                 FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
-            fi 
+                echo "Has IP ${FLOATING_IP}"
+            else
+                echo "Has no IP"
+            fi
 
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
                 # this is the first previous deployment I have found

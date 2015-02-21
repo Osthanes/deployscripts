@@ -218,6 +218,7 @@ deploy_red_black () {
 
     if [ -z "$REMOVE_FROM" ]; then 
         COUNTER=${BUILD_NUMBER}
+        let COUNTER-=1
     else 
         COUNTER=$REMOVE_FROM
     fi 
@@ -234,9 +235,9 @@ deploy_red_black () {
                 FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
-                echo "Has IP ${FLOATING_IP}"
-            else
                 echo "Has no IP"
+            else
+                echo "Has IP ${FLOATING_IP}"
             fi
 
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
@@ -259,8 +260,8 @@ deploy_red_black () {
         let COUNTER-=1
     done
     # check to see that I obtained a floating IP address
-    ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log 
-    FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
+    #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log 
+    #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
     if [ "${FLOATING_IP}" = '""' ]; then 
         echo "Requesting IP"
         FLOATING_IP=$(ice ip request | awk '{print $4}')
@@ -279,9 +280,11 @@ deploy_red_black () {
             export TEST_URL=""
             exit 1 
         fi 
-        echo "Exporting TEST_URL:${TEST_URL}"
-        export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${PORT}"
+    else 
+        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
     fi 
+    echo "Exporting TEST_URL:${TEST_URL}"
+    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${PORT}"
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     

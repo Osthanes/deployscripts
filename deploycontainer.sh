@@ -262,7 +262,7 @@ deploy_red_black () {
     # check to see that I obtained a floating IP address
     #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log 
     #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
-    if [ "${FLOATING_IP}" = '""' ]; then 
+    if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then 
         echo "Requesting IP"
         FLOATING_IP=$(ice ip request | awk '{print $4}')
         echo "allocating ${FLOATING_IP}"

@@ -308,7 +308,6 @@ elif  [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
 else 
     echo -e "${label_color}Defaulting to red_black deploy${no_color}"
-    usage
     deploy_red_black
 fi 
 dump_info

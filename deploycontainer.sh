@@ -265,6 +265,7 @@ deploy_red_black () {
     if [ "${FLOATING_IP}" = '""' ]; then 
         echo "Requesting IP"
         FLOATING_IP=$(ice ip request | awk '{print $4}')
+        echo "allocating ${FLOATING_IP}"
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Failed to allocate IP address ${no_color}" 

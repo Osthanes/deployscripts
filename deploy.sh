@@ -229,17 +229,17 @@ deploy_red_black () {
             echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
             # does it have a public IP address 
             let FOUND+=1
-            
-            if [ -z "${FLOATING_IP}" ]; then 
-                FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
-                temp="${FLOATING_IP%\"}"
-                FLOATING_IP="${temp#\"}"
-            fi 
-
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
+
+            elif [ $FOUND -le $CONCURRENT_VERSIONS ]; then
                 # this is the first previous deployment I have found
                 if [ -z "${FLOATING_IP}" ]; then 
-                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to allocate one"
+                    FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
+                    temp="${FLOATING_IP%\"}"
+                    FLOATING_IP="${temp#\"}"
+                fi 
+                if [ -z "${FLOATING_IP}" ]; then 
+                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to allocating one"
                 else 
                     echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
                     ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER}

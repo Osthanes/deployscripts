@@ -265,8 +265,8 @@ deploy_red_black () {
     if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then 
         echo "Requesting IP"
         FLOATING_IP=$(ice ip request | awk '{print $4}')
-        echo "allocating ${FLOATING_IP}"
         RESULT=$?
+        echo "allocating ${FLOATING_IP}"
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Failed to allocate IP address ${no_color}" 
             exit 1 
@@ -279,6 +279,7 @@ deploy_red_black () {
             echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}" 
             echo "Unsetting TEST_URL"
             export TEST_URL=""
+            dump_info
             exit 1 
         fi 
     else 

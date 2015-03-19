@@ -19,13 +19,13 @@ dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
     echo "Summary:"
-    ice info 
+    ice info 2> /dev/null 
 
  
-    export CONTAINER_LIMIT=$(ice info | grep "Containers limit" | awk '{print $4}')
-    export IP_LIMIT=$(ice info | grep "Floating IPs limit" | awk '{print $5}')
-    export CONTAINER_COUNT=$(ice info | grep "Containers usage" | awk '{print $4}')
-    export IP_COUNT=$(ice info | grep "Floating IPs usage" | awk '{print $5}')
+    export CONTAINER_LIMIT=$(ice info 2> /dev/null | grep "Containers limit" | awk '{print $4}')
+    export IP_LIMIT=$(ice info 2> /dev/null | grep "Floating IPs limit" | awk '{print $5}')
+    export CONTAINER_COUNT=$(ice info 2> /dev/null | grep "Containers usage" | awk '{print $4}')
+    export IP_COUNT=$(ice info 2> /dev/null | grep "Floating IPs usage" | awk '{print $5}')
     local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
     if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then 
@@ -42,13 +42,13 @@ dump_info () {
     fi  
 
     echo "Groups: "
-    ice group list
+    ice group list 2> /dev/null 
     echo "Routes: "
     cf routes 
     echo "Running Containers: "
-    ice ps 
+    ice ps 2> /dev/null 
     echo "All floating IP addresses"
-    ice ip list --all
+    ice ip list --all 2> /dev/null 
     return 0
 }
 
@@ -63,19 +63,19 @@ update_inventory(){
     local ID="undefined"
     # find the container or group id 
     if [ "$TYPE" == "ibm_containers" ]; then 
-        ID=$(ice inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        ID=$(ice inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Could not find container called $NAME${no_color}"
-            ice ps 
+            ice ps 2> /dev/null 
             return 1 
         fi 
 
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        ID=$(ice group inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        ID=$(ice group inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Could not find group called $NAME${no_color}"
-            ice group list 
+            ice group list 2> /dev/null 
             return 1 
         fi 
     else 
@@ -177,7 +177,7 @@ deploy_container() {
     fi  
  
     # run the container and check the results
-    ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME}
+    ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME} 2> /dev/null
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
@@ -223,7 +223,7 @@ deploy_red_black () {
     fi 
     local FOUND=0
     until [  $COUNTER -lt 1 ]; do
-        ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 
+        ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 2> /dev/null
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
             echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
@@ -245,14 +245,14 @@ deploy_red_black () {
                     echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to allocate one"
                 else 
                     echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
-                    ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER}
+                    ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                     sleep 2
-                    ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
+                    ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                     echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
                 fi 
             else 
                 echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
-                ice rm ${CONTAINER_NAME}_${COUNTER}
+                ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                 delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
             fi  
         fi 
@@ -263,16 +263,26 @@ deploy_red_black () {
     #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
     if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then 
         echo "Requesting IP"
-        FLOATING_IP=$(ice ip request | awk '{print $4}')
+        FLOATING_IP=$(ice ip request 2> /dev/null | awk '{print $4}' | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
         RESULT=$?
-        echo "allocating ${FLOATING_IP}"
         if [ $RESULT -ne 0 ]; then
-            echo -e "${red}Failed to allocate IP address ${no_color}" 
-            exit 1 
-        fi
-        temp="${FLOATING_IP%\"}"
-        FLOATING_IP="${temp#\"}"
-        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
+            echo -e "${label_color}Failed to request new IP address ${no_color}" 
+            FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
+            #strip off whitespace 
+            FLOATING_IP=${FLOATING_IP// /}
+            if [ -z "${FLOATING_IP}" ];then 
+                echo -e "${red}Could not request a new, or reuse existing IP address ${no_color}"
+                exit 1 
+            else 
+                echo "Assigning existing IP address $FLOATING_IP"
+            fi 
+        else 
+            # strip off junk 
+            temp="${FLOATING_IP%\"}"
+            FLOATING_IP="${temp#\"}"
+            echo "Assigning new IP address $FLOATING_IP"
+        fi 
+        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
             echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}" 
@@ -282,7 +292,7 @@ deploy_red_black () {
             exit 1 
         fi 
     else 
-        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
+        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
     fi 
     echo "Exporting TEST_URL:${TEST_URL}"
     export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:${PORT}"

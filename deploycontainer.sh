@@ -146,7 +146,7 @@ wait_for (){
     STATE="unknown"
     while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Running") ]]; do
         let COUNTER=COUNTER+1 
-        STATE=$(ice inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/"//g')
+        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then 
             STATE="being placed"
         fi 
@@ -218,7 +218,6 @@ deploy_red_black () {
 
     if [ -z "$REMOVE_FROM" ]; then 
         COUNTER=${BUILD_NUMBER}
-        let COUNTER-=1
     else 
         COUNTER=$REMOVE_FROM
     fi 
@@ -300,7 +299,7 @@ if [ -z "$URL_PROTOCOL" ]; then
  export URL_PROTOCOL="http://" 
 fi 
 if [ -z "$PORT" ]; then 
- export PORT=':80' 
+ export PORT='80' 
 fi 
 if [ -z "$CONCURRENT_VERSIONS" ];then 
     export CONCURRENT_VERSIONS=1

@@ -286,7 +286,7 @@ deploy_red_black () {
         ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}
     fi 
     echo "Exporting TEST_URL:${TEST_URL}"
-    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}${PORT}"
+    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:${PORT}"
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     

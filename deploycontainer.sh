@@ -177,7 +177,7 @@ deploy_container() {
     fi  
  
     # run the container and check the results
-    ice run --name "${MY_CONTAINER_NAME}" ${IMAGE_NAME}
+    ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"

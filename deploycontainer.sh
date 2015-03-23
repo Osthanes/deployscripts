@@ -266,12 +266,15 @@ deploy_red_black () {
         FLOATING_IP=$(ice ip request 2> /dev/null | awk '{print $4}' | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
-            echo -e "${label_color}Failed to request new IP address ${no_color}" 
+            echo -e "${label_color}Failed to request new IP address, will attempt to reuse existing IP${no_color}" 
             FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
+            debugme echo "FLOATING+IP: $FLOATING_IP"
             #strip off whitespace 
             FLOATING_IP=${FLOATING_IP// /}
+            debugme echo "FLOATING+IP: $FLOATING_IP"
             if [ -z "${FLOATING_IP}" ];then 
                 echo -e "${red}Could not request a new, or reuse existing IP address ${no_color}"
+                dump_info
                 exit 1 
             else 
                 echo "Assigning existing IP address $FLOATING_IP"

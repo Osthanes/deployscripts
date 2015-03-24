@@ -19,13 +19,14 @@ dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
     echo "Summary:"
-    ice info 
+    local ICEINFO=$(ice info 2>/dev/null)
+    echo "$ICEINFO"
 
- 
-    export CONTAINER_LIMIT=$(ice info | grep "Containers limit" | awk '{print $4}')
-    export IP_LIMIT=$(ice info | grep "Floating IPs limit" | awk '{print $5}')
-    export CONTAINER_COUNT=$(ice info | grep "Containers usage" | awk '{print $4}')
-    export IP_COUNT=$(ice info | grep "Floating IPs usage" | awk '{print $5}')
+
+    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
+    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
+    export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
+    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
     local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
     if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then 

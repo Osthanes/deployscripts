@@ -14,7 +14,6 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #********************************************************************************
-
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
@@ -43,13 +42,13 @@ dump_info () {
     fi  
 
     echo "Groups: "
-    ice group list 2> /dev/null 
+    ice group list
     echo "Routes: "
     cf routes 
     echo "Running Containers: "
-    ice ps 2> /dev/null 
+    ice ps 
     echo "All floating IP addresses"
-    ice ip list --all 2> /dev/null 
+    ice ip list --all
     return 0
 }
 
@@ -64,19 +63,19 @@ update_inventory(){
     local ID="undefined"
     # find the container or group id 
     if [ "$TYPE" == "ibm_containers" ]; then 
-        ID=$(ice inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
+        ID=$(ice inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
         RESULT=$?
-        if [ $RESULT -ne 0 ]; then
+        if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
             echo -e "${red}Could not find container called $NAME${no_color}"
-            ice ps 2> /dev/null 
+            ice ps 
             return 1 
         fi 
 
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        ID=$(ice group inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
-        if [ $RESULT -ne 0 ]; then
+        ID=$(ice group inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
             echo -e "${red}Could not find group called $NAME${no_color}"
-            ice group list 2> /dev/null 
+            ice group list 
             return 1 
         fi 
     else 
@@ -137,7 +136,7 @@ delete_inventory(){
  
 # function to wait for a container to start 
 # takes a container name as the only parameter
-wait_for (){
+wait_for_group (){
     local WAITING_FOR=$1 
     if [ -z ${WAITING_FOR} ]; then 
         echo "${red}Expected container name to be passed into wait_for${no_color}"
@@ -145,59 +144,89 @@ wait_for (){
     fi 
     COUNTER=0
     STATE="unknown"
-    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Running") ]]; do
+    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") ]]; do
         let COUNTER=COUNTER+1 
-        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
+        STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATE}" ]; then 
             STATE="being placed"
         fi 
         echo "${WAITING_FOR} is ${STATE}"
-        sleep 2
+        sleep 3
     done
-    if [ "$STATE" != "Running" ]; then
-        echo -e "${red}Failed to start instance ${no_color}"
+    if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
+        echo -e "${red}Failed to start group ${no_color}"
         return 1
     fi  
     return 0 
 }
  
-deploy_container() {
-    local MY_CONTAINER_NAME=$1 
-    echo "deploying container ${MY_CONTAINER_NAME}"
+deploy_group() {
+    local MY_GROUP_NAME=$1 
+    echo "deploying group ${MY_GROUP_NAME}"
  
-    if [ -z MY_CONTAINER_NAME ];then 
+    if [ -z MY_GROUP_NAME ];then 
         echo "${red}No container name was provided${no_color}"
         return 1 
     fi 
  
-    # check to see if that container name is already in use 
-    ice inspect ${MY_CONTAINER_NAME} > /dev/null
+    # check to see if that group name is already in use 
+    ice group inspect ${MY_GROUP_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then 
-        echo -e "${red}${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed${no_color}"
+        echo -e "${red}${MY_GROUP_NAME} already exists.${no_color}"
+        exit 1
     fi  
  
-    # run the container and check the results
-    ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME} 2> /dev/null
-    RESULT=$?
+    # create the group and check the results
+    if [ -z "${BIND_TO}" ]; then
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT}  --desired ${GROUP_DESIRED} ${IMAGE_NAME} "
+        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}    
+        RESULT=$?
+    else 
+        echo "Binding to ${BIND_TO}"
+        local APP=$(cf env ${BIND_TO})
+        local APP_FOUND=$?
+        if [ $APP_FOUND -ne 0 ]; then 
+            echo -e "${red}${BIND_TO} application not found in space.  Please confirm that you wish to bind the container to the application, and that the application exists${no_color}"
+        fi 
+        local VCAP_SERVICES=$(echo "${APP}" | grep "VCAP_SERVICES")
+        local SERVICES_BOUND=$?
+        if [ $SERVICES_BOUND -ne 0 ]; then 
+            echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
+        fi 
+        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}    
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}"
+        RESULT=$?
+    fi
     if [ $RESULT -ne 0 ]; then
-        echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
-        dump_info
+        echo -e "${red}Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}${no_color}"
         return 1
     fi 
- 
-    # wait for container to start 
-    wait_for ${MY_CONTAINER_NAME}
+
+    # wait for group to start 
+    wait_for_group ${MY_GROUP_NAME}
     RESULT=$?
-    if [ $RESULT -eq 0 ]; then 
-        insert_inventory "ibm_containers" ${MY_CONTAINER_NAME}
+    if [ $RESULT -eq 0 ]; then                 
+        insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
+        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then 
+            ice route map --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN $MY_GROUP_NAME
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then 
+                echo -e "${red}Failed to map $ROUTE_HOSTNAME $ROUTE_DOMAIN to $MY_GROUP_NAME.  Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage.${no_color}"
+                cf routes 
+            fi 
+        else 
+            echo "${label_color}No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment${no_color}"
+        fi 
+    else 
+        echo -e "${red}Failed to deploy group${no_color}"
     fi 
     return ${RESULT}
 }
  
 deploy_simple () {
-    local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
-    deploy_container ${MY_CONTAINER_NAME}
+    local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
+    deploy_group ${MY_GROUP_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}${no_color}"
@@ -208,13 +237,26 @@ deploy_simple () {
 deploy_red_black () {
     echo -e "${label_color}Example red_black container deploy ${no_color}"
     # deploy new version of the application 
-    local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
-    deploy_container ${MY_CONTAINER_NAME}
+    local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
+    deploy_group ${MY_GROUP_NAME}
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
     fi
 
+    if [ -z "$REMOVE_FROM" ]; then 
+        clean 
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            exit $RESULT
+        fi 
+    else 
+        echo "Not removing previous instances until after testing"
+    fi 
+    return 0
+}
+
+clean() {
     echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
 
     if [ -z "$REMOVE_FROM" ]; then 
@@ -224,83 +266,33 @@ deploy_red_black () {
     fi 
     local FOUND=0
     until [  $COUNTER -lt 1 ]; do
-        ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 2> /dev/null
-        RESULT=$?
+        echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
+        ice group inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 
+        local RESULT=$?
         if [ $RESULT -eq 0 ]; then
             echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
-            # does it have a public IP address 
             let FOUND+=1
-            
-            if [ -z "${FLOATING_IP}" ]; then 
-                FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
-                temp="${FLOATING_IP%\"}"
-                FLOATING_IP="${temp#\"}"
-                echo "Has no IP"
-            else
-                echo "Has IP ${FLOATING_IP}"
-            fi
-
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
-                # this is the first previous deployment I have found
-                if [ -z "${FLOATING_IP}" ]; then 
-                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to allocate one"
-                else 
-                    echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
-                    ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
-                    sleep 2
-                    ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                    echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
-                fi 
+                # this is the previous version so keep it around 
+                echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
+            elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+                # remove this group 
+                echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}" 
+                ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${CONTAINER_NAME}_${COUNTER}
+                sleep 2
+                echo "removing group ${CONTAINER_NAME}_${COUNTER}"
+                ice group rm ${CONTAINER_NAME}_${COUNTER}
+                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
             else 
-                echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
-                ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
-                delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
-            fi  
+                echo "removing group ${CONTAINER_NAME}_${COUNTER}"
+                ice group rm ${CONTAINER_NAME}_${COUNTER}
+                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
+            fi 
         fi 
         let COUNTER-=1
     done
-    # check to see that I obtained a floating IP address
-    #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log 
-    #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
-    if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then 
-        echo "Requesting IP"
-        FLOATING_IP=$(ice ip request 2> /dev/null | awk '{print $4}' | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
-        RESULT=$?
-        if [ $RESULT -ne 0 ]; then
-            echo -e "${label_color}Failed to request new IP address, will attempt to reuse existing IP${no_color}" 
-            FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
-            debugme echo "FLOATING+IP: $FLOATING_IP"
-            #strip off whitespace 
-            FLOATING_IP=${FLOATING_IP// /}
-            debugme echo "FLOATING+IP: $FLOATING_IP"
-            if [ -z "${FLOATING_IP}" ];then 
-                echo -e "${red}Could not request a new, or reuse existing IP address ${no_color}"
-                dump_info
-                exit 1 
-            else 
-                echo "Assigning existing IP address $FLOATING_IP"
-            fi 
-        else 
-            # strip off junk 
-            temp="${FLOATING_IP%\"}"
-            FLOATING_IP="${temp#\"}"
-            echo "Assigning new IP address $FLOATING_IP"
-        fi 
-        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -ne 0 ]; then
-            echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}" 
-            echo "Unsetting TEST_URL"
-            export TEST_URL=""
-            dump_info
-            exit 1 
-        fi 
-    else 
-        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-    fi 
-    echo "Exporting TEST_URL:${TEST_URL}"
-    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:${PORT}"
-    echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
+    echo "Cleaned up previous deployments"
+    return 0
 }
     
 ##################
@@ -309,25 +301,40 @@ deploy_red_black () {
 # Check to see what deployment type: 
 #   simple: simply deploy a container and set the inventory 
 #   red_black: deploy new container, assign floating IP address, keep original container 
-if [ -z "$URL_PROTOCOL" ]; then 
- export URL_PROTOCOL="http://" 
+echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
+if [ -z "$GROUP_DESIRED" ]; then 
+  export GROUP_DESIRED=1 
 fi 
 if [ -z "$PORT" ]; then 
- export PORT='80' 
+    export PORT=80
+fi 
+if [ -z "$ROUTE_HOSTNAME" ]; then 
+    echo -e "${label_color}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage.${no_color}"
+fi 
+if [ -z "$ROUTE_DOMAIN" ]; then 
+    echo -e "${label_color}ROUTE_DOMAIN not set, defaulting to mybluemix.net${no_color}"
+    export ROUTE_DOMAIN="mybluemix.net"
 fi 
 if [ -z "$CONCURRENT_VERSIONS" ];then 
     export CONCURRENT_VERSIONS=1
 fi 
- 
- 
-echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
-if [ "${DEPLOY_TYPE}" == "red_black" ]; then 
+
+if [ "${DEPLOY_TYPE}" == "simple" ]; then
+    deploy_simple
+elif [ "${DEPLOY_TYPE}" == "simple_public" ]; then 
+    deploy_public
+elif [ "${DEPLOY_TYPE}" == "clean" ]; then 
+    clean
+elif [ "${DEPLOY_TYPE}" == "red_black" ]; then 
     deploy_red_black
 else 
-    echo -e "${label_color}Currently only supporting red_black deployment strategy${no_color}"
+else 
+    echo -e "${label_color}Currently only supporting 'red_black' deployment and 'clean' strategy${no_color}"
     echo -e "${label_color}If you would like another strategy please fork https://github.com/Osthanes/deployscripts.git and submit a pull request${no_color}"
     echo -e "${label_color}Defaulting to red_black deploy${no_color}"
     deploy_red_black
 fi 
+fi 
+
 dump_info
 exit 0

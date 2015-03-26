@@ -255,7 +255,7 @@ deploy_red_black () {
         ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 2> /dev/null
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
+            echo "Found container ${CONTAINER_NAME}_${COUNTER}"
             # does it have a public IP address 
             let FOUND+=1
             
@@ -271,7 +271,7 @@ deploy_red_black () {
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
                 # this is the first previous deployment I have found
                 if [ -z "${FLOATING_IP}" ]; then 
-                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to allocate one"
+                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"
                 else 
                     echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
                     ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null

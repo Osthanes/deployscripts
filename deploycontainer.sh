@@ -143,8 +143,8 @@ wait_for (){
         echo "${red}Expected container name to be passed into wait_for${no_color}"
         return 1
     fi 
-    COUNTER=0
-    STATE="unknown"
+    local COUNTER=0
+    local STATE="unknown"
     while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Running") ]]; do
         let COUNTER=COUNTER+1 
         STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
@@ -156,6 +156,31 @@ wait_for (){
     done
     if [ "$STATE" != "Running" ]; then
         echo -e "${red}Failed to start instance ${no_color}"
+        return 1
+    fi  
+    return 0 
+}
+
+# function to wait for a container to start 
+# takes a container name as the only parameter
+wait_for_stopped (){
+    local WAITING_FOR=$1 
+    if [ -z ${WAITING_FOR} ]; then 
+        echo "${red}Expected container name to be passed into wait_for${no_color}"
+        return 1
+    fi 
+    local COUNTER=0
+    local FOUND=0
+    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Shutdown")  ]]; do
+        let COUNTER=COUNTER+1 
+        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
+        if [ -z "${STATE}" ]; then 
+            STATE="being deleted"
+        fi 
+        sleep 2
+    done
+    if [ "$STATE" != "Shutdown" ]; then
+        echo -e "${red}Failed to stop instance ${no_color}"
         return 1
     fi  
     return 0 
@@ -179,7 +204,7 @@ deploy_container() {
  
     # run the container and check the results
     ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME} 2> /dev/null
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
         dump_info
@@ -198,7 +223,7 @@ deploy_container() {
 deploy_simple () {
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_container ${MY_CONTAINER_NAME}
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}${no_color}"
         exit $RESULT
@@ -210,7 +235,7 @@ deploy_red_black () {
     # deploy new version of the application 
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_container ${MY_CONTAINER_NAME}
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
     fi
@@ -253,6 +278,8 @@ deploy_red_black () {
                 fi 
             else 
                 echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
+                ice stop ${CONTAINER_NAME}_${COUNTER} 
+                wait_for_stopped ${CONTAINER_NAME}_${COUNTER} 
                 ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                 delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
             fi  

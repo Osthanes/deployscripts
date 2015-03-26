@@ -328,13 +328,11 @@ elif [ "${DEPLOY_TYPE}" == "clean" ]; then
 elif [ "${DEPLOY_TYPE}" == "red_black" ]; then 
     deploy_red_black
 else 
-else 
     echo -e "${label_color}Currently only supporting 'red_black' deployment and 'clean' strategy${no_color}"
     echo -e "${label_color}If you would like another strategy please fork https://github.com/Osthanes/deployscripts.git and submit a pull request${no_color}"
     echo -e "${label_color}Defaulting to red_black deploy${no_color}"
     deploy_red_black
-fi 
-fi 
+fi  
 
 dump_info
 exit 0

@@ -180,9 +180,11 @@ wait_for_stopped (){
         sleep 2
     done
     if [ "$STATE" != "Shutdown" ]; then
-        echo -e "${red}Failed to stop instance ${no_color}"
+        echo -e "${red}Failed to stop instance $WAITING_FOR ${no_color}"
         return 1
-    fi  
+    else
+        echo -e "Successfully stopped $WAITING_FOR"
+    fi 
     return 0 
 }
  

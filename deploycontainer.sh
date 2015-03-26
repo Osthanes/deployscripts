@@ -236,6 +236,7 @@ deploy_red_black () {
     echo -e "${label_color}Example red_black container deploy ${no_color}"
     # deploy new version of the application 
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
+    local FLOATING_IP=""
     deploy_container ${MY_CONTAINER_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
@@ -262,9 +263,9 @@ deploy_red_black () {
                 FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
-                echo "Has no IP"
+                echo "Discovered previous IP ${FLOATING_IP}"
             else
-                echo "Has IP ${FLOATING_IP}"
+                echo "Did not discovered previous IP because we already have discovered $FLOATING_IP"
             fi
 
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then

@@ -308,6 +308,7 @@ fi
 if [ -z "$PORT" ]; then 
     export PORT=80
 fi 
+
 if [ -z "$ROUTE_HOSTNAME" ]; then 
     echo -e "${label_color}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage.${no_color}"
 fi 

@@ -331,7 +331,7 @@ elif [ "${AUTO_RECOVERY}" == "false" ] || [ "${AUTO_RECOVERY}" == "FALSE" ]; the
 	export AUTO=""
 else
 	echo -e "${label_color}AUTO_RECOVERY value is invalid. Please enter false or true value.${no_color}"
-	echo -e "${label_color}Setting AUTO_RECOVERY to false and continue deploy process.${no_color}"
+	echo -e "${label_color}Setting AUTO_RECOVERY value to false and continue deploy process.${no_color}"
 fi
 
 if [ "${DEPLOY_TYPE}" == "simple" ]; then

@@ -321,7 +321,7 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
 fi
 # Auto_recovery setting
 if [ -z "$AUTO_RECOVERY" ];then
-	echo -e "${label_color}AUTO_RECOVERY not set, defaulting to false${no_color}"
+	echo -e "AUTO_RECOVERY not set, defaulting to false$"
     export AUTO=""
 elif [ "${AUTO_RECOVERY}" == "true" ] || [ "${AUTO_RECOVERY}" == "TRUE" ]; then
 	echo -e "${label_color}AUTO_RECOVERY set to true${no_color}"

@@ -145,14 +145,14 @@ wait_for (){
     fi 
     local COUNTER=0
     local STATE="unknown"
-    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Running") ]]; do
+    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "Running") ]]; do
         let COUNTER=COUNTER+1 
         STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then 
             STATE="being placed"
         fi 
         echo "${WAITING_FOR} is ${STATE}"
-        sleep 2
+        sleep 3
     done
     if [ "$STATE" != "Running" ]; then
         echo -e "${red}Failed to start instance ${no_color}"

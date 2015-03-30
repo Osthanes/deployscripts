@@ -144,7 +144,7 @@ wait_for_group (){
     fi 
     COUNTER=0
     STATE="unknown"
-    while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") ]]; do
+    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") ]]; do
         let COUNTER=COUNTER+1 
         STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATE}" ]; then 

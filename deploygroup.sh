@@ -321,7 +321,7 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
 fi
 # Auto_recovery setting
 if [ -z "$AUTO_RECOVERY" ];then
-	echo -e "${label_color}AUTO_RECOVERY not set, defaulting to true${no_color}"
+	echo -e "${label_color}AUTO_RECOVERY not set, defaulting to false${no_color}"
     export AUTO=""
 elif [ "${AUTO_RECOVERY}" == "true" ] || [ "${AUTO_RECOVERY}" == "TRUE" ]; then
 	echo -e "${label_color}AUTO_RECOVERY set to true${no_color}"
@@ -330,7 +330,8 @@ elif [ "${AUTO_RECOVERY}" == "false" ] || [ "${AUTO_RECOVERY}" == "FALSE" ]; the
 	echo -e "${label_color}AUTO_RECOVERY set to false${no_color}"
 	export AUTO=""
 else
-	echo -e "Invalid value for Auto-recovery ${no_color}. The Auto-recovery value should be false or true"
+	echo -e "${label_color}AUTO_RECOVERY value is invalid. Please enter false or true value.${no_color}"
+	echo -e "${label_color}Defaulting to false and continue deploy process.${no_color}"
 fi
 
 if [ "${DEPLOY_TYPE}" == "simple" ]; then

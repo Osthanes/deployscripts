@@ -271,7 +271,7 @@ deploy_red_black () {
             else
                 echo "Did not discovered previous IP because we already have discovered $FLOATING_IP"
             fi
-            if ["${COUNTER}" -ne "${BUILD_NUMBER}"]; then
+            if [ "${COUNTER}" -ne "${BUILD_NUMBER}" ]; then
                 # this is a previous deployment
                 if [ -z "${FLOATING_IP}" ]; then 
                     echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"

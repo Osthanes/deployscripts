@@ -275,7 +275,7 @@ deploy_red_black () {
                 # this is a previous deployment
                 if [ -z "${FLOATING_IP}" ]; then 
                     echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"
-                elif [ -z "${IP_JUST_FOUND}"]; then
+                elif [ -z "${IP_JUST_FOUND}" ]; then
                     echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
                     ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                     sleep 2

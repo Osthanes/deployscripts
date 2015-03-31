@@ -237,6 +237,7 @@ deploy_red_black () {
     # deploy new version of the application 
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     local FLOATING_IP=""
+    local IP_JUST_FOUND=""
     deploy_container ${MY_CONTAINER_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
@@ -263,29 +264,34 @@ deploy_red_black () {
                 FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
-                echo "Discovered previous IP ${FLOATING_IP}"
+                if [ -n "${FLOATING_IP}" ]; then
+                   echo "Discovered previous IP ${FLOATING_IP}"
+                   IP_JUST_FOUND=$FLOATING_IP
+                fi
             else
-                echo "Did not discovered previous IP because we already have discovered $FLOATING_IP"
+                echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
             fi
-
-            if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
-                # this is the first previous deployment I have found
+            if [ "${COUNTER}" -ne "${BUILD_NUMBER}" ]; then
+                # this is a previous deployment
                 if [ -z "${FLOATING_IP}" ]; then 
                     echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"
-                else 
+                elif [ -n "${IP_JUST_FOUND}" ]; then
                     echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
                     ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                     sleep 2
                     ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                    echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
                 fi 
-            else 
-                echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
-                ice stop ${CONTAINER_NAME}_${COUNTER} 
-                wait_for_stopped ${CONTAINER_NAME}_${COUNTER} 
-                ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
-                delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
-            fi  
+                if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
+                    echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
+                else 
+                    echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}" 
+                    ice stop ${CONTAINER_NAME}_${COUNTER} 
+                    wait_for_stopped ${CONTAINER_NAME}_${COUNTER} 
+                    ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
+                    delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
+                fi  
+            fi
+            IP_JUST_FOUND=""
         fi 
         let COUNTER-=1
     done

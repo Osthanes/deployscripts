@@ -179,8 +179,8 @@ deploy_group() {
  
     # create the group and check the results
     if [ -z "${BIND_TO}" ]; then
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT}  --desired ${GROUP_DESIRED} ${IMAGE_NAME} "
-        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}    
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT}  --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
+        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}    
         RESULT=$?
     else 
         echo "Binding to ${BIND_TO}"
@@ -194,8 +194,8 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then 
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi 
-        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}    
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${GROUP_DESIRED} ${IMAGE_NAME}"
+        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}    
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then
@@ -302,8 +302,13 @@ clean() {
 #   simple: simply deploy a container and set the inventory 
 #   red_black: deploy new container, assign floating IP address, keep original container 
 echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
-if [ -z "$GROUP_DESIRED" ]; then 
-  export GROUP_DESIRED=1 
+
+check_num='^[0-9]+$'
+if [ -z "$DESIRED_INSTANCES" ]; then 
+  export DESIRED_INSTANCES=1
+elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
+	echo -e "${label_color}DESIRED_INSTANCES value is not a number, defaulting to 1 and continue deploy process.${no_color}"
+	export DESIRED_INSTANCES=1 
 fi 
 if [ -z "$PORT" ]; then 
     export PORT=80
@@ -318,6 +323,20 @@ if [ -z "$ROUTE_DOMAIN" ]; then
 fi 
 if [ -z "$CONCURRENT_VERSIONS" ];then 
     export CONCURRENT_VERSIONS=1
+fi
+# Auto_recovery setting
+if [ -z "$AUTO_RECOVERY" ];then
+	echo -e "AUTO_RECOVERY not set, defaulting to false."
+    export AUTO=""
+elif [ "${AUTO_RECOVERY}" == "true" ] || [ "${AUTO_RECOVERY}" == "TRUE" ]; then
+	echo -e "${label_color}AUTO_RECOVERY set to true.${no_color}"
+    export AUTO="--auto"
+elif [ "${AUTO_RECOVERY}" == "false" ] || [ "${AUTO_RECOVERY}" == "FALSE" ]; then
+	echo -e "${label_color}AUTO_RECOVERY set to false.${no_color}"
+	export AUTO=""
+else
+	echo -e "${label_color}AUTO_RECOVERY value is invalid. Please enter false or true value.${no_color}"
+	echo -e "${label_color}Setting AUTO_RECOVERY value to false and continue deploy process.${no_color}"
 fi 
 
 if [ "${DEPLOY_TYPE}" == "simple" ]; then

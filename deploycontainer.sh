@@ -264,12 +264,12 @@ deploy_red_black () {
                 FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
-                if [ -z "${FLOATING_IP}" ]; then
+                if [ -n "${FLOATING_IP}" ]; then
                    echo "Discovered previous IP ${FLOATING_IP}"
                    IP_JUST_FOUND=$FLOATING_IP
                 fi
             else
-                echo "Did not discovered previous IP because we already have discovered $FLOATING_IP"
+                echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
             fi
             if [ "${COUNTER}" -ne "${BUILD_NUMBER}" ]; then
                 # this is a previous deployment

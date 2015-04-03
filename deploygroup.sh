@@ -23,9 +23,7 @@ dump_info () {
 
  
     export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
     export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
     local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
     if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then 
@@ -33,22 +31,25 @@ dump_info () {
     elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
         echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
     fi 
- 
-    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
-    if [ ${AVAILABLE} -le 0 ]; then 
-        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
-    else
-        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
-    fi  
+
+#    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
+#    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
+# 
+#    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
+#    if [ ${AVAILABLE} -le 0 ]; then 
+#        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
+#    else
+#        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
+#    fi  
 
     echo "Groups: "
-    ice group list
+    ice group list 2> /dev/null 
     echo "Routes: "
     cf routes 
     echo "Running Containers: "
-    ice ps 
+    ice ps 2> /dev/null 
     echo "All floating IP addresses"
-    ice ip list --all
+    ice ip list 2> /dev/null 
     return 0
 }
 

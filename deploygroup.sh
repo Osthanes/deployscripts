@@ -48,8 +48,11 @@ dump_info () {
     cf routes 
     echo "Running Containers: "
     ice ps 2> /dev/null 
-    echo "All floating IP addresses"
+    echo "Floating IP addresses"
     ice ip list 2> /dev/null 
+    echo "Images:"
+    ice images
+
     return 0
 }
 

@@ -183,8 +183,8 @@ deploy_group() {
 
     # create the group and check the results
     if [ -z "${BIND_TO}" ]; then
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT}  --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
-        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
+        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     else
         echo "Binding to ${BIND_TO}"
@@ -198,8 +198,8 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then
@@ -314,9 +314,15 @@ elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
     echo -e "${label_color}DESIRED_INSTANCES value is not a number, defaulting to 1 and continue deploy process.${no_color}"
     export DESIRED_INSTANCES=1
 fi
+# check for port as a number separate by commas and replace commas with --publish 
+check_num='^[0-9,,]+$'
 if [ -z "$PORT" ]; then
     export PORT=80
+elif ! [[ "$PORT" =~ $check_num ]] ; then
+    echo -e "${label_color}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}"
+    export PORT=80    
 fi
+PORT="--publish $(echo $PORT | sed 's/,/ --publish /g')"
 
 if [ -z "$ROUTE_HOSTNAME" ]; then
     echo -e "${label_color}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage.${no_color}"
@@ -341,6 +347,23 @@ elif [ "${AUTO_RECOVERY}" == "false" ] || [ "${AUTO_RECOVERY}" == "FALSE" ]; the
 else
     echo -e "${label_color}AUTO_RECOVERY value is invalid. Please enter false or true value.${no_color}"
     echo -e "${label_color}Setting AUTO_RECOVERY value to false and continue deploy process.${no_color}"
+    export AUTO=""
+fi
+
+# check for container size and set the value as MB
+if [ -z "$CONTAINER_SIZE" ];then
+    export MEMORY=""
+elif [ "$CONTAINER_SIZE" == "m1.tiny" ]; then
+    export MEMORY=""
+elif [ "$CONTAINER_SIZE" == "m1.small" ]; then
+    export MEMORY="--memory 512" 
+elif [ "$CONTAINER_SIZE" == "m1.medium" ]; then
+    export MEMORY="--memory 1024" 
+elif [ "$CONTAINER_SIZE" == "m1.large" ]; then
+    export MEMORY="--memory 2048" 
+else
+    echo -e "${label_color}CONTAINER_SIZE value is invalid, defaulting to m1.tiny (256 MB memory) and continue deploy process.${no_color}"
+    export MEMORY=""            
 fi
 
 if [ "${DEPLOY_TYPE}" == "simple" ]; then

@@ -210,13 +210,8 @@ deploy_container() {
  
     # run the container and check the results
     if [ -z "${BIND_TO}" ]; then
-        if [ -z "$SSH_KEY" ]; then
-           echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} ${IMAGE_NAME} "
-           ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} ${IMAGE_NAME} 2> /dev/null
-        else
-            echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --ssh \"${SSH_KEY}\" ${IMAGE_NAME} "
-           ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --ssh "${SSH_KEY}" ${IMAGE_NAME} 2> /dev/null
-        fi
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} 2> /dev/null
         local RESULT=$?
     else
         echo "Binding to ${BIND_TO}"
@@ -230,13 +225,8 @@ deploy_container() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        if [ -z "$SSH_KEY" ]; then
-           echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} "
-           ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
-        else
-            echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --bind ${BIND_TO} --ssh \"${SSH_KEY}\" ${IMAGE_NAME} "
-           ice run --name ${MY_CONTAINER_NAME} ${PORT} ${MEMORY} --bind ${BIND_TO} --ssh "${SSH_KEY}" ${IMAGE_NAME} 2> /dev/null
-        fi
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then
@@ -366,7 +356,8 @@ deploy_red_black () {
         ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
     fi 
     echo "Exporting TEST_URL:${TEST_URL}"
-    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:${PORT}"
+    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
+
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     
@@ -426,18 +417,18 @@ elif ! [[ "$PORT" =~ $check_num ]] ; then
     echo -e "${label_color}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}"
     export PORT=80    
 fi
-PORT="--publish $(echo $PORT | sed 's/,/ --publish /g')"
+PUBLISH_PORT="--publish $(echo $PORT | sed 's/,/ --publish /g')"
 
 # check for container size and set the value as MB
 if [ -z "$CONTAINER_SIZE" ];then
     export MEMORY=""
-elif [ "$CONTAINER_SIZE" == "m1.tiny" ]; then
+elif [ "$CONTAINER_SIZE" == "m1.tiny" ] || [ "$CONTAINER_SIZE" == "256" ]; then
     export MEMORY=""
-elif [ "$CONTAINER_SIZE" == "m1.small" ]; then
+elif [ "$CONTAINER_SIZE" == "m1.small" ] || [ "$CONTAINER_SIZE" == "512" ]; then
     export MEMORY="--memory 512" 
-elif [ "$CONTAINER_SIZE" == "m1.medium" ]; then
+elif [ "$CONTAINER_SIZE" == "m1.medium" ] || [ "$CONTAINER_SIZE" == "1024" ]; then
     export MEMORY="--memory 1024" 
-elif [ "$CONTAINER_SIZE" == "m1.large" ]; then
+elif [ "$CONTAINER_SIZE" == "m1.large" ] || [ "$CONTAINER_SIZE" == "2048" ]; then
     export MEMORY="--memory 2048" 
 else
     echo -e "${label_color}CONTAINER_SIZE value is invalid, defaulting to m1.tiny (256 MB memory) and continue deploy process.${no_color}"

@@ -363,7 +363,7 @@ else
         ice info > iceinfo.log 2> /dev/null
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            check_memory_quota()
+            $(check_memory_quota $MEMORY)
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 echo -e "${red}Quota exceeded for container size: The selected container size $CONT_SIZE plus current memory usage $MEMORY_USAGE exceeded the memory quota $MEMORY_LIMIT. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2

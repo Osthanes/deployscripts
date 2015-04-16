@@ -366,7 +366,7 @@ else
             $(check_memory_quota $MEMORY)
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
-                echo -e "${red}Quota exceeded for container size: The selected container size $CONT_SIZE plus current memory usage $MEMORY_USAGE exceeded the memory quota $MEMORY_LIMIT. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2
+                echo -e "${red}Quota exceeded for container size: The selected container size $CONTAINER_SIZE exceeded the memory limit. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2
                 exit 1
             else
                 export MEMORY="--memory ${MEMORY}"

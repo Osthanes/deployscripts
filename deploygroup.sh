@@ -16,7 +16,7 @@
 #********************************************************************************
 
 # load helper functions
-source ${EXT_DIR}/deploy_utilities.sh
+source $(dirname "$0"}/deploy_utilities.sh
 
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"

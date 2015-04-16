@@ -15,6 +15,9 @@
 #   See the License for the specific language governing permissions and
 #********************************************************************************
 
+# load helper functions
+source deploy_utilities.sh
+
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
@@ -399,45 +402,7 @@ clean() {
     echo "Cleaned up previous deployments"
     return 0
 }    
-  
-########################################
-# get memory size
-########################################  
-get_memory()
-{
-    local CONT_SIZE=$1
-    local RET_MEMORY=256
-    # check for container size and set the value as MB
-    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
-        RET_MEMORY=256
-    elif [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
-        RET_MEMORY=512
-    elif [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
-        RET_MEMORY=1024
-    elif [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
-        RET_MEMORY=2048
-    else
-        echo -e "${red}$CONT_SIZE value is invalid, defaulting to m1.tiny (256 MB memory) and continue deploy process.${no_color}"
-        RET_MEMORY=256
-    fi
-    # check the memory size for limit quota
-    ice info > inspect.log 2> /dev/null
-    RESULT=$?
-    if [ $RESULT -eq 0 ]; then
-         local MEMORY_LIMIT=$(grep "Memory limit (MB)" inspect.log | awk '{print $5}')
-         local MEMORY_USAGE=$(grep "Memory usage (MB)" inspect.log | awk '{print $5}')
-         if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
-             echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. defaulting to m1.tiny (256 MB memory) and continue deploy process.${no_color}"
-         else
-             if [ $(echo "$MEMORY_LIMIT - $MEMORY_USAGE" | bc) -lt $RET_MEMORY ]; then
-                 echo -e "${red}Memory quota limit: The selected container size $CONT_SIZE passes the limit. You need to select smaller container size or delete some of the your existing containers.${no_color}"
-                 exit 1
-             fi
-         fi
-    fi
-    echo "$RET_MEMORY"
-}
-  
+
 ##################
 # Initialization #
 ##################
@@ -463,7 +428,21 @@ if [ -z "$CONTAINER_SIZE" ];then
 else
     export MEMORY=$(get_memory $CONTAINER_SIZE)
     if [ -n "$MEMORY" ]; then
-        export MEMORY="--memory ${MEMORY}"
+        ice info > iceinfo.log 2> /dev/null
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            check_memory_quota()
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then
+                echo -e "${red}Quota exceeded for container size: The selected container size $CONT_SIZE plus current memory usage $MEMORY_USAGE exceeded the memory quota $MEMORY_LIMIT. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2
+                exit 1
+            else
+                export MEMORY="--memory ${MEMORY}"
+            fi
+        else
+            echo -e "${red}Unable to call ice info${no_color}" >&2
+            exit 1
+        fi
     else
         export MEMORY=""
     fi

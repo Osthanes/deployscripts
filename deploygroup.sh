@@ -318,23 +318,23 @@ elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
     echo -e "${label_color}DESIRED_INSTANCES value is not a number, defaulting to 1 and continue deploy process.${no_color}"
     export DESIRED_INSTANCES=1
 fi
-# check for port as a number separate by commas and replace commas with --publish 
-check_num='^[0-9,,]+$'
+
+# set the poet numbers with --publish  
 if [ -z "$PORT" ]; then
-    export PORT=80
-elif ! [[ "$PORT" =~ $check_num ]] ; then
-    echo -e "${label_color}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}"
-    export PORT=80    
+    export PUBLISH_PORT="--publish 80"
+else
+    export PUBLISH_PORT=$(get_port_numbers $PORT)    
 fi
-PUBLISH_PORT="--publish $(echo $PORT | sed 's/,/ --publish /g')"
 
 if [ -z "$ROUTE_HOSTNAME" ]; then
     echo -e "${label_color}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage.${no_color}"
 fi
+
 if [ -z "$ROUTE_DOMAIN" ]; then
     echo -e "${label_color}ROUTE_DOMAIN not set, defaulting to mybluemix.net${no_color}"
     export ROUTE_DOMAIN="mybluemix.net"
 fi
+
 if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
 fi
@@ -358,25 +358,11 @@ fi
 if [ -z "$CONTAINER_SIZE" ];then
     export MEMORY=""
 else
-    export MEMORY=$(get_memory $CONTAINER_SIZE)
-    if [ -n "$MEMORY" ]; then
-        ice info > iceinfo.log 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            $(check_memory_quota $MEMORY)
-            RESULT=$?
-            if [ $RESULT -ne 0 ]; then
-                echo -e "${red}Quota exceeded for container size: The selected container size $CONTAINER_SIZE exceeded the memory limit. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2
-                exit 1
-            else
-                export MEMORY="--memory ${MEMORY}"
-            fi
-        else
-            echo -e "${red}Unable to call ice info${no_color}" >&2
-            exit 1
-        fi
+    RET_MEMORY=$(get_memory_size $CONTAINER_SIZE)
+    if [ $RET_MEMORY == -1 ]; then
+        exit 1;
     else
-        export MEMORY=""
+        export MEMORY="--memory $RET_MEMORY"
     fi
 fi
 

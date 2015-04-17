@@ -19,31 +19,58 @@
 # appropriate function.
 
 # uncomment the next line to debug this script
-# set -x
+#set -x
 
-########################################
-# normalize memory size - adjust to the allowed set of memory sizes
-########################################  
-get_memory() {
-    local CONT_SIZE=$1
-    local RET_MEMORY=256
-    # check for container size and set the value as MB
-    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
-        RET_MEMORY=256
-    elif [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
-        RET_MEMORY=512
-    elif [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
-        RET_MEMORY=1024
-    elif [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
-        RET_MEMORY=2048
-    else
-        echo -e "${red}$CONT_SIZE is an invalid value, defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
-        RET_MEMORY=256
+###################################################################
+# get port numbers
+################################################################### 
+get_port_numbers() {
+    local PORT_NUM=$1
+    local RETVAL=""
+    local OIFS=$IFS
+    # check for port as a number separate by commas and replace commas with --publish 
+    check_num='^[[:digit:][:space:],,]+$'
+    if ! [[ "$PORT_NUM" =~ $check_num ]] ; then
+        echo -e "${red}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}" >&2
+        PORT_NUM=80    
     fi
-    echo "$RET_MEMORY"
+    # let commas split as well as whitespace
+    set -f; IFS=$IFS+","
+    for port in $PORT_NUM; do
+        if [ "${port}x" != "x" ]; then
+            RETVAL="$RETVAL --publish $port"
+        fi
+    done
+    set =f; IFS=$OIFS
+
+    echo $RETVAL
 }
 
+###################################################################
+# normalize memory size - adjust to the allowed set of memory sizes
+################################################################### 
+get_memory() {
+    local CONT_SIZE=$1
+    local NEW_MEMORY=256
+    # check for container size and set the value as MB
+    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
+        NEW_MEMORY=256
+    elif [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
+        NEW_MEMORY=512
+    elif [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
+        NEW_MEMORY=1024
+    elif [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
+        NEW_MEMORY=2048
+    else
+        echo -e "${red}$CONT_SIZE is an invalid value, defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
+        NEW_MEMORY=256
+    fi
+    echo "$NEW_MEMORY"
+}
 
+###################################################################
+# check_memory_quota
+################################################################### 
 # this function expects a file "iceinfo.log" to exist in the current director, being the output of a call to 'ice info'
 # example:
 #    ice info > iceinfo.log 2> /dev/null
@@ -70,10 +97,38 @@ check_memory_quota() {
     return 0
 }
 
+###################################################################
+# get memory size
+################################################################### 
+get_memory_size() {
+    local CONT_SIZE=$1
+    local NEW_MEMORY=$(get_memory $CONT_SIZE)
+    ice info > iceinfo.log 2> /dev/null
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        $(check_memory_quota $NEW_MEMORY)
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            echo -e "${red}Quota exceeded for container size: The selected container size $CONT_SIZE exceeded the memory limit. You need to select smaller container size or delete some of your existing containers.${no_color}" >&2
+            NEW_MEMORY="-1"
+        fi
+    else
+        echo -e "${red}Unable to call ice info${no_color}" >&2
+        NEW_MEMORY="-1"
+    fi
+    echo "$NEW_MEMORY"
+}
+
+###################################################################
+# Unit Test
+################################################################### 
 # internal function, selfcheck unit test to make sure things are working
 # as expected
 unittest() {
     local RET=0
+
+    # Unit Test for get_memory() function
+    #############################################
     RET=$(get_memory 256 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check 256)"
@@ -135,6 +190,8 @@ unittest() {
         return 21
     fi
 
+    # Unit Test for check_memory_quota() function
+    #############################################
     echo "Memory limit (MB)      : 2048" >iceinfo.log 
     echo "Memory usage (MB)      : 0" >>iceinfo.log
     $(check_memory_quota 256 2> /dev/null)
@@ -187,32 +244,102 @@ unittest() {
         echo "incorrect pass for too much memory 2048+\"-1\")"
         return 34
     fi
+
+    # Unit Test for get_port_numbers() function
+    #############################################
+    RET=$(get_port_numbers "80" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80x" ]; then
+        echo "ut fail (bad publish value on port check \"80\")"
+        return 40
+    fi
+    RET=$(get_port_numbers "80,8080" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad publish value on port check \"80,8080\")"
+        return 41
+    fi
+    RET=$(get_port_numbers "80,8080 " 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad error check on trailing space \"80, 8080 \")"
+        return 42
+    fi
+    RET=$(get_port_numbers "80,8080 ," 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad error check on trailing space and comma \"80, 8080 ,\")"
+        return 43
+    fi
+    RET=$(get_port_numbers "80, 8080" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad error check on intervening space \"80, 8080\")"
+        return 44
+    fi
+    RET=$(get_port_numbers "badvalue" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80x" ]; then
+        echo "ut fail (bad error check on invalid value)"
+        return 45
+    fi
+    RET=$(get_port_numbers "80,,,,8080" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad filtering on internal commas)"
+        return 46
+    fi
+    RET=$(get_port_numbers ",,,,80,8080" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad filtering on leading commas)"
+        return 47
+    fi
+    RET=$(get_port_numbers "80,8080,,,," 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad filtering on trailing commas)"
+        return 48
+    fi
+    RET=$(get_port_numbers "80    8080" 2> /dev/null)
+    if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
+        echo "ut fail (bad check on no commas)"
+        return 49
+    fi
+
     return 0
 }
 
+# Unit test for the memory size
 unittest
-if [ ! $? -eq 0 ]; then
-    echo "Unit test failed, aborting"
+UTRC=$?
+if [ $UTRC -ne 0 ]; then
+    echo "Unit test failed, aborting with return code $UTRC"
 else
     # allow run the script with --get_memory parameter to check get_memory with custom parms directly
-    if [ "$1" == "--get_memory" ]; then
-        shift
-        rc=0
-        for i in $@
-        do
-            COMMAND="get_memory $i"
-            echo "testing call \"$COMMAND\""
-            $COMMAND
-            rcc=$?
-            if [ $rc -eq 0 ]; then
-                rc=$rcc
-            fi
+    FTTCMD=$1
+    if [ ! -z $FTTCMD ]; then
+        if [ "$FTTCMD" == "--get_memory" ]; then
+            FTTCMD="get_memory"
+        elif [ "$FTTCMD" == "--check_memory_quota" ]; then
+            FTTCMD="check_memory_quota"
+        elif [ "$FTTCMD" == "--get_port_numbers" ]; then
+            FTTCMD="get_port_numbers"
+        else
+            FTTCMD=""
+        fi
+
+        if [ "${FTTCMD}x" != "x" ]; then
             shift
-        done
-        # only exit if running directly, if done in source will
-        # kill the parent shell
-        echo "Return code is $rc"
-        exit $rc
+            rc=0
+            for i in $@
+            do
+                COMMAND="$FTTCMD $i"
+                echo "testing call \"$COMMAND\""
+                $COMMAND
+                rcc=$?
+                if [ $rc -eq 0 ]; then
+                    rc=$rcc
+                fi
+                shift
+            done
+            # only exit if running directly, if done in source will
+            # kill the parent shell
+            echo "Return code is $rc"
+            exit $rc
+        fi
     fi
 fi
+
 

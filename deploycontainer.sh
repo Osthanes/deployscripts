@@ -15,6 +15,9 @@
 #   See the License for the specific language governing permissions and
 #********************************************************************************
 
+# load helper functions
+source $(dirname "$0")/deploy_utilities.sh
+
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
@@ -209,13 +212,31 @@ deploy_container() {
     fi  
  
     # run the container and check the results
-    ice run --name "${MY_CONTAINER_NAME}" --publish "${PORT}" ${IMAGE_NAME} 2> /dev/null
-    local RESULT=$?
+    if [ -z "${BIND_TO}" ]; then
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} 2> /dev/null
+        local RESULT=$?
+    else
+        echo "Binding to ${BIND_TO}"
+        local APP=$(cf env ${BIND_TO})
+        local APP_FOUND=$?
+        if [ $APP_FOUND -ne 0 ]; then
+            echo -e "${red}${BIND_TO} application not found in space.  Please confirm that you wish to bind the container to the application, and that the application exists${no_color}"
+        fi
+        local VCAP_SERVICES=$(echo "${APP}" | grep "VCAP_SERVICES")
+        local SERVICES_BOUND=$?
+        if [ $SERVICES_BOUND -ne 0 ]; then
+            echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
+        fi
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
+        RESULT=$?
+    fi
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
         dump_info
         return 1
-    fi 
+    fi
  
     # wait for container to start 
     wait_for ${MY_CONTAINER_NAME}
@@ -338,10 +359,50 @@ deploy_red_black () {
         ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
     fi 
     echo "Exporting TEST_URL:${TEST_URL}"
-    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:${PORT}"
+    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
+
     echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
     
+clean() {
+    echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
+
+    if [ -z "$REMOVE_FROM" ]; then
+        COUNTER=${BUILD_NUMBER}
+    else
+        COUNTER=$REMOVE_FROM
+    fi
+    local FOUND=0
+    until [  $COUNTER -lt 1 ]; do
+        echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
+        ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log
+        local RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
+            let FOUND+=1
+            if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
+                # this is the previous version so keep it around
+                echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
+            elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+                # remove this container
+                echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}"
+                ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${CONTAINER_NAME}_${COUNTER}
+                sleep 2
+                echo "removing ${CONTAINER_NAME}_${COUNTER}"
+                ice rm ${CONTAINER_NAME}_${COUNTER}
+                delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
+            else
+                echo "removing ${CONTAINER_NAME}_${COUNTER}"
+                ice rm ${CONTAINER_NAME}_${COUNTER}
+                delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
+            fi
+        fi
+        let COUNTER-=1
+    done
+    echo "Cleaned up previous deployments"
+    return 0
+}    
+
 ##################
 # Initialization #
 ##################
@@ -351,17 +412,36 @@ deploy_red_black () {
 if [ -z "$URL_PROTOCOL" ]; then 
  export URL_PROTOCOL="http://" 
 fi 
-if [ -z "$PORT" ]; then 
- export PORT='80' 
-fi 
+
+# set the poet numbers with --publish 
+if [ -z "$PORT" ]; then
+    export PUBLISH_PORT="--publish 80"
+else
+    export PUBLISH_PORT=$(get_port_numbers $PORT)    
+fi
+
+# set the memory size
+if [ -z "$CONTAINER_SIZE" ];then
+    export MEMORY=""
+else
+    RET_MEMORY=$(get_memory_size $CONTAINER_SIZE)
+    if [ $RET_MEMORY == -1 ]; then
+        exit 1;
+    else
+        export MEMORY="--memory $RET_MEMORY"
+    fi
+fi
+
+# set current version
 if [ -z "$CONCURRENT_VERSIONS" ];then 
     export CONCURRENT_VERSIONS=1
 fi 
  
- 
 echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then 
     deploy_red_black
+elif [ "${DEPLOY_TYPE}" == "clean" ]; then
+    clean
 else 
     echo -e "${label_color}Currently only supporting red_black deployment strategy${no_color}"
     echo -e "${label_color}If you would like another strategy please fork https://github.com/Osthanes/deployscripts.git and submit a pull request${no_color}"

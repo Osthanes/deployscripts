@@ -14,6 +14,10 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #********************************************************************************
+
+# load helper functions
+source $(dirname "$0")/deploy_utilities.sh
+
 dump_info () {
     echo -e "${label_color}Container Information: ${no_color}"
     echo -e "${label_color}Information about this organization and space${no_color}:"
@@ -183,8 +187,8 @@ deploy_group() {
 
     # create the group and check the results
     if [ -z "${BIND_TO}" ]; then
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --publish ${PORT}  --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
-        ice group create --name ${MY_GROUP_NAME} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
+        ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     else
         echo "Binding to ${BIND_TO}"
@@ -198,8 +202,8 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} --publish ${PORT} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then
@@ -314,17 +318,23 @@ elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
     echo -e "${label_color}DESIRED_INSTANCES value is not a number, defaulting to 1 and continue deploy process.${no_color}"
     export DESIRED_INSTANCES=1
 fi
+
+# set the poet numbers with --publish  
 if [ -z "$PORT" ]; then
-    export PORT=80
+    export PUBLISH_PORT="--publish 80"
+else
+    export PUBLISH_PORT=$(get_port_numbers $PORT)    
 fi
 
 if [ -z "$ROUTE_HOSTNAME" ]; then
     echo -e "${label_color}ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage.${no_color}"
 fi
+
 if [ -z "$ROUTE_DOMAIN" ]; then
     echo -e "${label_color}ROUTE_DOMAIN not set, defaulting to mybluemix.net${no_color}"
     export ROUTE_DOMAIN="mybluemix.net"
 fi
+
 if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
 fi
@@ -341,6 +351,19 @@ elif [ "${AUTO_RECOVERY}" == "false" ] || [ "${AUTO_RECOVERY}" == "FALSE" ]; the
 else
     echo -e "${label_color}AUTO_RECOVERY value is invalid. Please enter false or true value.${no_color}"
     echo -e "${label_color}Setting AUTO_RECOVERY value to false and continue deploy process.${no_color}"
+    export AUTO=""
+fi
+
+# set the memory size
+if [ -z "$CONTAINER_SIZE" ];then
+    export MEMORY=""
+else
+    RET_MEMORY=$(get_memory_size $CONTAINER_SIZE)
+    if [ $RET_MEMORY == -1 ]; then
+        exit 1;
+    else
+        export MEMORY="--memory $RET_MEMORY"
+    fi
 fi
 
 if [ "${DEPLOY_TYPE}" == "simple" ]; then

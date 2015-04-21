@@ -23,16 +23,16 @@
 
 ###################################################################
 # get port numbers
-################################################################### 
+###################################################################
 get_port_numbers() {
     local PORT_NUM=$1
     local RETVAL=""
     local OIFS=$IFS
-    # check for port as a number separate by commas and replace commas with --publish 
+    # check for port as a number separate by commas and replace commas with --publish
     check_num='^[[:digit:][:space:],,]+$'
     if ! [[ "$PORT_NUM" =~ $check_num ]] ; then
         echo -e "${red}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}" >&2
-        PORT_NUM=80    
+        PORT_NUM=80
     fi
     # let commas split as well as whitespace
     set -f; IFS=$IFS+","
@@ -48,7 +48,7 @@ get_port_numbers() {
 
 ###################################################################
 # normalize memory size - adjust to the allowed set of memory sizes
-################################################################### 
+###################################################################
 get_memory() {
     local CONT_SIZE=$1
     local NEW_MEMORY=256
@@ -70,7 +70,7 @@ get_memory() {
 
 ###################################################################
 # check_memory_quota
-################################################################### 
+###################################################################
 # this function expects a file "iceinfo.log" to exist in the current director, being the output of a call to 'ice info'
 # example:
 #    ice info > iceinfo.log 2> /dev/null
@@ -99,7 +99,7 @@ check_memory_quota() {
 
 ###################################################################
 # get memory size
-################################################################### 
+###################################################################
 get_memory_size() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory $CONT_SIZE)
@@ -121,7 +121,7 @@ get_memory_size() {
 
 ###################################################################
 # Unit Test
-################################################################### 
+###################################################################
 # internal function, selfcheck unit test to make sure things are working
 # as expected
 unittest() {
@@ -192,7 +192,7 @@ unittest() {
 
     # Unit Test for check_memory_quota() function
     #############################################
-    echo "Memory limit (MB)      : 2048" >iceinfo.log 
+    echo "Memory limit (MB)      : 2048" >iceinfo.log
     echo "Memory usage (MB)      : 0" >>iceinfo.log
     $(check_memory_quota 256 2> /dev/null)
     RET=$?
@@ -201,7 +201,7 @@ unittest() {
         return 30
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log 
+    echo "Memory limit (MB)      : 2048" >iceinfo.log
     echo "Memory usage (MB)      : 1024" >>iceinfo.log
     $(check_memory_quota 2048 2> /dev/null)
     RET=$?
@@ -210,7 +210,7 @@ unittest() {
         return 31
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log 
+    echo "Memory limit (MB)      : 2048" >iceinfo.log
     echo "Memory usage (MB)      : 2048" >>iceinfo.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
@@ -218,7 +218,7 @@ unittest() {
         echo "ut fail (incorrect pass for too much memory 2048+512)"
         return 32
     fi
-    echo "Memory limit (MB)      : 1024" >iceinfo.log 
+    echo "Memory limit (MB)      : 1024" >iceinfo.log
     echo "Memory usage (MB)      : 0" >>iceinfo.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
@@ -227,7 +227,7 @@ unittest() {
         return 33
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log 
+    echo "Memory limit (MB)      : 2048" >iceinfo.log
     echo "Memory usage (MB)      : 1024" >>iceinfo.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?
@@ -236,7 +236,7 @@ unittest() {
         return 34
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log 
+    echo "Memory limit (MB)      : 2048" >iceinfo.log
     echo "Memory usage (MB)      : 2048" >>iceinfo.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?

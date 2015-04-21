@@ -25,35 +25,35 @@ dump_info () {
     local ICEINFO=$(ice info 2>/dev/null)
     echo "$ICEINFO"
 
- 
+
     export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
     export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
     local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
-    if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then 
+    if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
         echo -e "${red}You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers ${no_color}"
     elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
         echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
-    fi 
+    fi
 
 #    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
 #    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
-# 
+#
 #    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
-#    if [ ${AVAILABLE} -le 0 ]; then 
+#    if [ ${AVAILABLE} -le 0 ]; then
 #        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
 #    else
 #        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
-#    fi  
+#    fi
 
     echo "Groups: "
-    ice group list 2> /dev/null 
+    ice group list 2> /dev/null
     echo "Routes: "
-    cf routes 
+    cf routes
     echo "Running Containers: "
-    ice ps 2> /dev/null 
+    ice ps 2> /dev/null
     echo "Floating IP addresses"
-    ice ip list 2> /dev/null 
+    ice ip list 2> /dev/null
     echo "Images:"
     ice images
 
@@ -322,11 +322,11 @@ elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
     export DESIRED_INSTANCES=1
 fi
 
-# set the poet numbers with --publish  
+# set the port numbers with --publish
 if [ -z "$PORT" ]; then
     export PUBLISH_PORT="--publish 80"
 else
-    export PUBLISH_PORT=$(get_port_numbers $PORT)    
+    export PUBLISH_PORT=$(get_port_numbers "${PORT}")
 fi
 
 if [ -z "$ROUTE_HOSTNAME" ]; then

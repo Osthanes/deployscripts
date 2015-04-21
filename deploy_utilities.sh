@@ -28,8 +28,6 @@ get_port_numbers() {
     local PORT_NUM=$1
     local RETVAL=""
     local OIFS=$IFS
-    echo "get_port_numbers(): Port Numbers:  ${PORT_NUM}"
-
     # check for port as a number separate by commas and replace commas with --publish
     check_num='^[[:digit:][:space:],,]+$'
     if ! [[ "$PORT_NUM" =~ $check_num ]] ; then
@@ -39,12 +37,9 @@ get_port_numbers() {
     # let commas split as well as whitespace
     set -f; IFS=$IFS+","
     for port in $PORT_NUM; do
-    echo "get_port_numbers(): port:  ${port}"
-
         if [ "${port}x" != "x" ]; then
             RETVAL="$RETVAL --publish $port"
-    echo "get_port_numbers(): RETVAL:  ${RETVAL}"
-                fi
+        fi
     done
     set =f; IFS=$OIFS
 

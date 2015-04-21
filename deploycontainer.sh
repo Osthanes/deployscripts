@@ -413,14 +413,11 @@ if [ -z "$URL_PROTOCOL" ]; then
 fi
 
 # set the port numbers with --publish
-echo "Port Numbers:  ${PORT}"
 if [ -z "$PORT" ]; then
     export PUBLISH_PORT="--publish 80"
 else
     export PUBLISH_PORT=$(get_port_numbers "${PORT}")
 fi
-echo "PUBLISH_PORT Numbers:  ${PUBLISH_PORT}"
-
 
 # set the memory size
 if [ -z "$CONTAINER_SIZE" ];then

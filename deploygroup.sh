@@ -158,7 +158,7 @@ wait_for_group (){
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
-        if [ "${STATE}x" == "\"CREATE_FAILED\"" ]; then
+        if [ "${STATE}x" == "\"CREATE_FAILED\"x" ]; then
             echo -e "${red}Failed to start group ${no_color}"
             return 1
         fi

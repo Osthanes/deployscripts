@@ -27,13 +27,16 @@ dump_info () {
 
 
     export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-    local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
+    # if container limit is disabled no need to check and warn
+    if [ ${CONTAINER_COUNT} -ge 0 ]; then
+        export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
+        local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
-    if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-        echo -e "${red}You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers ${no_color}"
-    elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-        echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
+        if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
+            echo -e "${red}You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers ${no_color}"
+        elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
+            echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
+        fi
     fi
 
 #    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')

@@ -158,6 +158,10 @@ wait_for_group (){
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
+        if [ "${STATE}x" == "\"CREATE_FAILED\"x" ]; then
+            echo -e "${red}Failed to start group ${no_color}"
+            return 1
+        fi
         echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
@@ -185,12 +189,9 @@ deploy_group() {
         exit 1
     fi
 
-    # create the group and check the results
-    if [ -z "${BIND_TO}" ]; then
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
-        ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
-        RESULT=$?
-    else
+    local BIND_PARMS=""
+    # validate the bind_to parameter if one was passed
+    if [ ! -z "${BIND_TO}" ]; then
         echo "Binding to ${BIND_TO}"
         local APP=$(cf env ${BIND_TO})
         local APP_FOUND=$?
@@ -202,10 +203,12 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
-        RESULT=$?
+        BIND_PARMS="--bind ${BIND_TO}"
     fi
+    # create the group and check the results
+    echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}${no_color}"
         return 1

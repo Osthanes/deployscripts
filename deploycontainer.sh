@@ -210,13 +210,10 @@ deploy_container() {
     if [ ${FOUND} -eq 0 ]; then 
         echo -e "${red}${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed${no_color}"
     fi  
- 
-    # run the container and check the results
-    if [ -z "${BIND_TO}" ]; then
-        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} "
-        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} 2> /dev/null
-        local RESULT=$?
-    else
+
+    local BIND_PARMS="" 
+    # validate the bind_to parameter if one was passed
+    if [ ! -z "${BIND_TO}" ]; then
         echo "Binding to ${BIND_TO}"
         local APP=$(cf env ${BIND_TO})
         local APP_FOUND=$?
@@ -228,10 +225,12 @@ deploy_container() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} "
-        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
-        RESULT=$?
+        BIND_PARMS="--bind ${BIND_TO}"
     fi
+    # run the container and check the results
+    echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
+    ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} 2> /dev/null
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
         dump_info

@@ -213,8 +213,8 @@ deploy_container() {
  
     # run the container and check the results
     if [ -z "${BIND_TO}" ]; then
-        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} "
-        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${IMAGE_NAME} 2> /dev/null
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${IMAGE_NAME} 2> /dev/null
         local RESULT=$?
     else
         echo "Binding to ${BIND_TO}"
@@ -228,8 +228,8 @@ deploy_container() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} "
-        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
+        echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --bind ${BIND_TO} ${IMAGE_NAME} "
+        ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --bind ${BIND_TO} ${IMAGE_NAME} 2> /dev/null
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then

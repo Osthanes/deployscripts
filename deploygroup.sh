@@ -187,8 +187,8 @@ deploy_group() {
 
     # create the group and check the results
     if [ -z "${BIND_TO}" ]; then
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
-        ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} "
+        ice group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     else
         echo "Binding to ${BIND_TO}"
@@ -202,8 +202,8 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
         fi
-        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+        echo "creating group: ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+        ice group create --name ${MY_GROUP_NAME} --bind ${BIND_TO} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
         RESULT=$?
     fi
     if [ $RESULT -ne 0 ]; then

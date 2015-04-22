@@ -226,9 +226,15 @@ deploy_group() {
         fi
         BIND_PARMS="--bind ${BIND_TO}"
     fi
+    # check for injected environment vars to pass to `ice run`:
+    # any environment variables beginning with "INJECT_" will be passed to the container as --env
+    INJECTED_ENV=()
+    while read line; do
+        INJECTED_ENV+=("--env ${line#INJECT_}")
+    done < <( env | grep "^INJECT_" )
     # create the group and check the results
     echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${INJECTED_ENV[*]} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}${no_color}"

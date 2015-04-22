@@ -248,9 +248,15 @@ deploy_container() {
         fi
         BIND_PARMS="--bind ${BIND_TO}"
     fi
+    # check for injected environment vars to pass to `ice run`:
+    # any environment variables beginning with "INJECT_" will be passed to the container as --env
+    INJECTED_ENV=()
+    while read line; do
+        INJECTED_ENV+=("--env ${line#INJECT_}")
+    done < <( env | grep "^INJECT_" )
     # run the container and check the results
     echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
-    ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} 2> /dev/null
+    ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${INJECTED_ENV[*]} ${IMAGE_NAME} 2> /dev/null
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"

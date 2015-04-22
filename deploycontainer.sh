@@ -41,6 +41,22 @@ dump_info () {
         fi
     fi
 
+    # check memory limit, warn user if we're at or approaching the limit
+    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    # if memory limit is disabled no need to check and warn
+    if [ ! -z ${MEMORY_LIMIT} ]; then
+        if [ ${MEMORY_LIMIT} -ge 0 ]; then
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
+            local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
+
+            if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
+                echo -e "${red}You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used ${no_color}"
+            elif [ ${MEMORY_USAGE} -ge ${MEM_WARNING_LEVEL} ]; then
+                echo -e "${label_color}You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}${no_color}"
+            fi
+        fi
+    fi
+
 #    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
 #    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
 #

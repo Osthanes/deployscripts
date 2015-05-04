@@ -173,7 +173,7 @@ wait_for (){
     fi
     local COUNTER=0
     local STATE="unknown"
-    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "Running") ]]; do
+    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "Running") && ("${STATE}" != "Crashed") ]]; do
         let COUNTER=COUNTER+1
         STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then
@@ -182,6 +182,11 @@ wait_for (){
         echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
+    if [ "$STATE" == "Crashed" ]; then
+        echo -e "${red}Container instance crashed. Removing the crashed container ${WAITING_FOR} ${no_color}"
+        ice rm ${WAITING_FOR} 2> /dev/null
+        return 1
+    fi
     if [ "$STATE" != "Running" ]; then
         echo -e "${red}Failed to start instance ${no_color}"
         return 1

@@ -182,6 +182,11 @@ wait_for (){
         echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
+    if [ "$STATE" == "Crashed" ]; then
+        echo -e "${red}Container instance crashed. Removing the crashed container ${WAITING_FOR} ${no_color}"
+        ice rm ${WAITING_FOR} 2> /dev/null
+        return 1
+    fi
     if [ "$STATE" != "Running" ]; then
         echo -e "${red}Failed to start instance ${no_color}"
         return 1

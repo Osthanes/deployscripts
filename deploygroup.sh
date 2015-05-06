@@ -333,7 +333,7 @@ clean() {
 # Check to see what deployment type:
 #   simple: simply deploy a container and set the inventory
 #   red_black: deploy new container, assign floating IP address, keep original container
-echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
+echo "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
 
 check_num='^[0-9]+$'
 if [ -z "$DESIRED_INSTANCES" ]; then

@@ -462,7 +462,7 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
 fi
 
-echo "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
+echo "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then

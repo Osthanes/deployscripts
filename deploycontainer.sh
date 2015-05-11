@@ -168,7 +168,7 @@ delete_inventory(){
 wait_for (){
     local WAITING_FOR=$1
     if [ -z ${WAITING_FOR} ]; then
-        echo "${red}Expected container name to be passed into wait_for${no_color}"
+        echo -e "${red}Expected container name to be passed into wait_for${no_color}"
         return 1
     fi
     local COUNTER=0
@@ -199,7 +199,7 @@ wait_for (){
 wait_for_stopped (){
     local WAITING_FOR=$1
     if [ -z ${WAITING_FOR} ]; then
-        echo "${red}Expected container name to be passed into wait_for${no_color}"
+        echo -e "${red}Expected container name to be passed into wait_for${no_color}"
         return 1
     fi
     local COUNTER=0
@@ -226,7 +226,7 @@ deploy_container() {
     echo "deploying container ${MY_CONTAINER_NAME}"
 
     if [ -z MY_CONTAINER_NAME ];then
-        echo "${red}No container name was provided${no_color}"
+        echo -e "${red}No container name was provided${no_color}"
         return 1
     fi
 
@@ -462,7 +462,7 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
 fi
 
-echo "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
+echo -e "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then

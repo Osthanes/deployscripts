@@ -168,7 +168,7 @@ delete_inventory(){
 wait_for_group (){
     local WAITING_FOR=$1
     if [ -z ${WAITING_FOR} ]; then
-        echo "${red}Expected container name to be passed into wait_for${no_color}"
+        echo -e "${red}Expected container name to be passed into wait_for${no_color}"
         return 1
     fi
     COUNTER=0
@@ -198,7 +198,7 @@ deploy_group() {
     echo "deploying group ${MY_GROUP_NAME}"
 
     if [ -z MY_GROUP_NAME ];then
-        echo "${red}No container name was provided${no_color}"
+        echo -e "${red}No container name was provided${no_color}"
         return 1
     fi
 
@@ -248,7 +248,7 @@ deploy_group() {
                 cf routes
             fi
         else
-            echo "${label_color}No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment${no_color}"
+            echo -e "${label_color}No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment${no_color}"
         fi
     else
         echo -e "${red}Failed to deploy group${no_color}"
@@ -333,7 +333,7 @@ clean() {
 # Check to see what deployment type:
 #   simple: simply deploy a container and set the inventory
 #   red_black: deploy new container, assign floating IP address, keep original container
-echo "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
+echo -e "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
 
 check_num='^[0-9]+$'
 if [ -z "$DESIRED_INSTANCES" ]; then

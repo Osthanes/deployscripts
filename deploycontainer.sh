@@ -473,5 +473,8 @@ else
     log_and_echo "$WARN" "Defaulting to red_black deploy"
     deploy_red_black
 fi
+#DEBUG
+log_and_echo "$ERROR" "Fake Error in deploy script"
 dump_info
-exit 0
+#DEBUG Exit with error
+exit 1

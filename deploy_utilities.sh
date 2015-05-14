@@ -22,6 +22,52 @@
 #set -x
 
 ###################################################################
+# protect against logging functions not being loaded              #
+#    An older version of the extension will not have them loaded  #
+#    Will default to just performing an echo with colors          #
+###################################################################
+if [ ! declare -f -F log_and_echo ]; then
+    INFO="INFO_LEVEL"
+    LABEL="LABEL_LEVEL"
+    WARN="WARN_LEVEL"
+    ERROR="ERROR_LEVEL"
+
+    INFO_LEVEL=4
+    WARN_LEVEL=2
+    ERROR_LEVEL=1
+    OFF_LEVEL=0
+    
+    log_and_echo() {
+        local MSG_TYPE="$1"
+        if [ "$INFO" == "$MSG_TYPE" ]; then
+            shift
+            local pre=""
+            local post=""
+        elif [ "$LABEL" == "$MSG_TYPE" ]; then
+            shift
+            local pre="${label_color}"
+            local post="${no_color}"
+        elif [ "$WARN" == "$MSG_TYPE" ]; then
+            shift
+            local pre="${label_color}"
+            local post="${no_color}"
+        elif [ "$ERROR" == "$MSG_TYPE" ]; then
+            shift
+            local pre="${red}"
+            local post="${no_color}"
+        else
+            #NO MSG type specified; fall through to INFO level
+            #Do not shift
+            local pre=""
+            local post=""
+        fi
+        local L_MSG=`echo -e "$*"`
+        echo -e "${pre}${L_MSG}${post}"
+    }
+fi
+
+
+###################################################################
 # get port numbers
 ###################################################################
 get_port_numbers() {

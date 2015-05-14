@@ -20,7 +20,7 @@ source $(dirname "$0")/deploy_utilities.sh
 
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
-    log_and_echo "$LABEL" "Information about this organization and space${no_color}:"
+    log_and_echo "$LABEL" "Information about this organization and space:"
     log_and_echo "$INFO" " Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
     log_and_echo "$INFO" " $ICEINFO"

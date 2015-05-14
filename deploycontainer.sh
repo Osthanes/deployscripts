@@ -77,7 +77,7 @@ dump_info () {
     log_and_echo `ice ip list 2> /dev/null`
     log_and_echo "Images:"
     log_and_echo `ice images`
-
+    print_errors
     return 0
 }
 

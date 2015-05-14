@@ -27,6 +27,7 @@
 #    Will default to just performing an echo with colors          #
 ###################################################################
 if [[ ! "$(declare -f -F log_and_echo)" ]]; then
+    echo "Setting up log_and_echo to just echo with color"
     INFO="INFO_LEVEL"
     LABEL="LABEL_LEVEL"
     WARN="WARN_LEVEL"

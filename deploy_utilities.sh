@@ -26,7 +26,7 @@
 #    An older version of the extension will not have them loaded  #
 #    Will default to just performing an echo with colors          #
 ###################################################################
-if [ ! declare -f -F log_and_echo ]; then
+if [[ ! "$(declare -f -F log_and_echo)" ]]; then
     INFO="INFO_LEVEL"
     LABEL="LABEL_LEVEL"
     WARN="WARN_LEVEL"

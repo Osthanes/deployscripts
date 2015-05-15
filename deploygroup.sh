@@ -324,12 +324,12 @@ deploy_group() {
         # Map route the container group
         if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
-            RESULT=$?
-            if [ $RESULT -eq 0 ]; then
+            RET=$?
+            if [ $RET -eq 0 ]; then
                 log_and_echo "${green}Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
             else
                 if [ "${DEBUG}x" != "1x" ]; then
-                    log_and_echo "$WARN" "You can check the route status with 'curl ${HOSTNAME}.${DOMAIN}' command after the deploy completed."
+                    log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
                 else
                     log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
                 fi

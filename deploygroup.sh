@@ -102,10 +102,15 @@ update_inventory(){
 
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
         ID=$(ice group inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        RESULT=$?
         if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
-            log_and_echo "$ERROR" "Could not find group called $NAME"
-            ice group list
-            return 1
+            local GROUP_LIST_STATE=$(ice group list  | grep ${NAME} | awk '{print $3}')
+            RESULT=$?
+            if [ $RESULT -ne 0 ] || [ -z "${GROUP_LIST_STATE}" ]; then
+                log_and_echo "$ERROR" "Could not find group called $NAME"
+                ice group list
+                return 1
+            fi
         fi
     else
         log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"

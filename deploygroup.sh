@@ -173,9 +173,11 @@ wait_for_group (){
     fi
     COUNTER=0
     STATE="unknown"
-    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") ]]; do
+    GROUP_LIST_STATE="unknown"
+    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") && ("${GROUP_LIST_STATE}" != "CREATE_FAILED") ]]; do
         let COUNTER=COUNTER+1
         STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        GROUP_LIST_STATE=$(ice group list  | grep ${WAITING_FOR} | awk '{print $3}')
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
@@ -187,7 +189,78 @@ wait_for_group (){
         sleep 3
     done
     if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
-        log_and_echo "$ERROR" "Failed to start group "
+        if [ "$GROUP_LIST_STATE" == "CREATE_FAILED" ]; then
+            log_and_echo "$ERROR" "Failed to create group"
+        else
+            log_and_echo "$ERROR" "Failed to start group"
+        return 1
+    fi
+    return 0
+}
+
+# function to map url route the container group
+# takes a MY_GROUP_NAME, ROUTE_HOSTNAME and ROUTE_DOMAIN as the parameters
+map_url_route_to_container_group (){
+    local GROUP_NAME=$1
+    local HOSTNAME=$2
+    local DOMAIN=$3
+    if [ -z ${GROUP_NAME} ]; then
+        log_and_echo "$ERROR" "Expected container group name to be passed into route_container_group"
+        return 1
+    fi
+    if [ -z ${HOSTNAME} ]; then
+        log_and_echo "$ERROR" "Expected hostname name to be passed into route_container_group"
+        return 1
+    fi
+    if [ -z ${DOMAIN} ]; then
+        log_and_echo "$ERROR" "Expected domain name to be passed into route_container_group"
+        return 1
+    fi
+    # Check domain name is valid
+    cf check-route ${HOSTNAME} ${DOMAIN} 2>&1> /dev/null
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        # Map hostnameName.domainName to the container group.
+        log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
+        ice route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            # loop until the route to container group success with retun code 200 or time out after 30 minutes.
+            local COUNTER=0
+            local RESPONSE="0"
+            log_and_echo "Wating to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
+            if [ $DEBUG -eq 1 ]: then
+                TIME_OUT=60
+            else
+                TIME_OUT=270
+            fi
+            while [[ ( $COUNTER -lt $TIME_OUT ) ]]; do
+                let COUNTER=COUNTER+1
+                RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
+                if [ "$RESPONSE" -eq 200 ]; then
+                    log_and_echo "$LABEL" "Map requested route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed."
+                    break
+                else
+                    log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') does not exist (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
+                    sleep 10
+                fi
+            done
+            if [ "$RESPONSE" -ne 200 ]; then
+                if [ $DEBUG -eq 1 ]: then
+                    log_and_echo "$WARN" "Requested route ('${HOSTNAME}.${DOMAIN}') still being setup."
+                else
+                    log_and_echo "$WARN" "Route ${HOSTNAME}.${DOMAIN} does not exist (Response code = ${RESPONSE}.  Please ensure that the routes are setup correctly."
+                fi
+                cf routes
+                return 1
+            fi
+        else
+            log_and_echo "$ERROR" "Failed to route map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."
+            cf routes
+            return 1
+        fi
+    else
+        log_and_echo "$ERROR" "Domain $DOMAIN not found. Please ensure that ROUTE_DOMAIN value is entered correctly on the Stage environment."
         return 1
     fi
     return 0
@@ -240,15 +313,21 @@ deploy_group() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
+        # Map route the container group
         if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
-            ice route map --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN $MY_GROUP_NAME
+            map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RESULT=$?
-            if [ $RESULT -ne 0 ]; then
-                log_and_echo "$ERROR" "Failed to map $ROUTE_HOSTNAME $ROUTE_DOMAIN to $MY_GROUP_NAME.  Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
-                cf routes
+            if [ $RESULT -eq 0 ]; then
+                log_and_echo "$LABEL" "Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
+            else
+                if [ $DEBUG -eq 1 ]: then
+                    log_and_echo "$WARN" "You can check the route status with 'curl ${HOSTNAME}.${DOMAIN}' command after the deploy completed."
+                else
+                    log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
+                fi
             fi
         else
-            log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment"
+            log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
     else
         log_and_echo "$ERROR" "Failed to deploy group"

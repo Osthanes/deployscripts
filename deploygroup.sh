@@ -233,12 +233,12 @@ map_url_route_to_container_group (){
         ice route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            # loop until the route to container group success with retun code 200 or time out after 30 minutes.
+            # loop until the route to container group success with retun code 200 or time-out.
             local COUNTER=0
             local RESPONSE="0"
             log_and_echo "Wating to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
-            if [ -n "${DEBUG}" ] && [ $DEBUG -ne 1 ]; then
-                local TIME_OUT=60
+            if [ "${DEBUG}x" != "1x" ]; then
+                local TIME_OUT=6
             else
                 local TIME_OUT=270
             fi
@@ -254,7 +254,7 @@ map_url_route_to_container_group (){
                 fi
             done
             if [ "$RESPONSE" -ne 200 ]; then
-                if [ -n "${DEBUG}" ] && [ $DEBUG -ne 1 ]; then
+                if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "Requested route ('${HOSTNAME}.${DOMAIN}') still being setup."
                 else
                     log_and_echo "$WARN" "Route ${HOSTNAME}.${DOMAIN} does not exist (Response code = ${RESPONSE}.  Please ensure that the routes are setup correctly."
@@ -328,7 +328,7 @@ deploy_group() {
             if [ $RESULT -eq 0 ]; then
                 log_and_echo "${green}Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
             else
-                if [ -n "${DEBUG}" ] && [ $DEBUG -ne 1 ]; then
+                if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${HOSTNAME}.${DOMAIN}' command after the deploy completed."
                 else
                     log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."

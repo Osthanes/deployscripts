@@ -193,6 +193,7 @@ wait_for_group (){
             log_and_echo "$ERROR" "Failed to create group"
         else
             log_and_echo "$ERROR" "Failed to start group"
+        fi
         return 1
     fi
     return 0

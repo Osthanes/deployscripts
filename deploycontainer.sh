@@ -19,11 +19,11 @@
 source $(dirname "$0")/deploy_utilities.sh
 
 dump_info () {
-    echo -e "${label_color}Container Information: ${no_color}"
-    echo -e "${label_color}Information about this organization and space${no_color}:"
-    echo "Summary:"
+    log_and_echo "$LABEL" "Container Information: "
+    log_and_echo "$LABEL" "Information about this organization and space:"
+    log_and_echo "$INFO" " Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
-    echo "$ICEINFO"
+    log_and_echo "$INFO" " $ICEINFO"
 
 
     export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
@@ -34,9 +34,9 @@ dump_info () {
             local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
 
             if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-                echo -e "${red}You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers ${no_color}"
+                log_and_echo "$ERROR" "You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers "
             elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-                echo -e "${label_color}There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}${no_color}"
+                log_and_echo "$WARN" "There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}"
             fi
         fi
     fi
@@ -50,9 +50,9 @@ dump_info () {
             local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
 
             if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
-                echo -e "${red}You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used ${no_color}"
+                log_and_echo "$ERROR" "You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used "
             elif [ ${MEMORY_USAGE} -ge ${MEM_WARNING_LEVEL} ]; then
-                echo -e "${label_color}You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}${no_color}"
+                log_and_echo "$WARN" "You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}"
             fi
         fi
     fi
@@ -67,17 +67,16 @@ dump_info () {
 #        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
 #    fi
 
-    echo "Groups: "
-    ice group list 2> /dev/null
-    echo "Routes: "
-    cf routes
-    echo "Running Containers: "
-    ice ps 2> /dev/null
-    echo "Floating IP addresses"
-    ice ip list 2> /dev/null
-    echo "Images:"
-    ice images
-
+    log_and_echo "Groups: "
+    log_and_echo `ice group list 2> /dev/null`
+    log_and_echo "Routes: "
+    log_and_echo `cf routes`
+    log_and_echo "Running Containers: "
+    log_and_echo `ice ps 2> /dev/null`
+    log_and_echo "Floating IP addresses"
+    log_and_echo `ice ip list 2> /dev/null`
+    log_and_echo "Images:"
+    log_and_echo `ice images`
     return 0
 }
 
@@ -86,7 +85,7 @@ update_inventory(){
     local NAME=$2
     local ACTION=$3
     if [ $# -ne 3 ]; then
-        echo -e "${red}updating inventory expects a three inputs: 1. type 2. name 3. action. Where type is either group or container, and the name is the name of the container being added to the inventory.${no_color}"
+        log_and_echo "$ERROR" "updating inventory expects a three inputs: 1. type 2. name 3. action. Where type is either group or container, and the name is the name of the container being added to the inventory."
         return 1
     fi
     local ID="undefined"
@@ -95,7 +94,7 @@ update_inventory(){
         ID=$(ice inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
-            echo -e "${red}Could not find container called $NAME${no_color}"
+            log_and_echo "$ERROR" "Could not find container called $NAME"
             ice ps 2> /dev/null
             return 1
         fi
@@ -103,12 +102,12 @@ update_inventory(){
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
         ID=$(ice group inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
         if [ $RESULT -ne 0 ]; then
-            echo -e "${red}Could not find group called $NAME${no_color}"
+            log_and_echo "$ERROR" "Could not find group called $NAME"
             ice group list 2> /dev/null
             return 1
         fi
     else
-        echo -e "${red}Could not update inventory with unknown type: ${TYPE}${no_color}"
+        log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"
         return 1
     fi
 
@@ -116,10 +115,10 @@ update_inventory(){
     # trim off junk
     local temp="${ID%\",}"
     ID="${temp#\"}"
-    echo "The ID of the $TYPE is: $ID"
+    log_and_echo "The ID of the $TYPE is: $ID"
 
     # find other inventory information
-    echo -e "${label_color}Updating inventory with $TYPE of $NAME ${no_color}"
+    log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
     IDS_INV_URL="${IDS_URL%/}"
     IDS_REQUEST=$TASK_ID
     IDS_DEPLOYER=${JOB_NAME##*/}
@@ -148,10 +147,10 @@ update_inventory(){
 
     IDS_RESOURCE=$CF_SPACE_ID
     if [ -z "$IDS_RESOURCE" ]; then
-        echo -e "${red}Could not find CF SPACE in environment, using production space id${no_color}"
+        log_and_echo "$ERROR" "Could not find CF SPACE in environment, using production space id"
     else
         # call IBM DevOps Service Inventory CLI to update the entry for this deployment
-        echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION"
+        log_and_echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION"
         bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION
     fi
 }
@@ -168,7 +167,7 @@ delete_inventory(){
 wait_for (){
     local WAITING_FOR=$1
     if [ -z ${WAITING_FOR} ]; then
-        echo -e "${red}Expected container name to be passed into wait_for${no_color}"
+        log_and_echo "$ERROR" "Expected container name to be passed into wait_for"
         return 1
     fi
     local COUNTER=0
@@ -179,16 +178,16 @@ wait_for (){
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
-        echo "${WAITING_FOR} is ${STATE}"
+        log_and_echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
     if [ "$STATE" == "Crashed" ]; then
-        echo -e "${red}Container instance crashed. Removing the crashed container ${WAITING_FOR} ${no_color}"
+        log_and_echo "$ERROR" "Container instance crashed. Removing the crashed container ${WAITING_FOR} "
         ice rm ${WAITING_FOR} 2> /dev/null
         return 1
     fi
     if [ "$STATE" != "Running" ]; then
-        echo -e "${red}Failed to start instance ${no_color}"
+        log_and_echo "$ERROR" "Failed to start instance "
         return 1
     fi
     return 0
@@ -199,7 +198,7 @@ wait_for (){
 wait_for_stopped (){
     local WAITING_FOR=$1
     if [ -z ${WAITING_FOR} ]; then
-        echo -e "${red}Expected container name to be passed into wait_for${no_color}"
+        log_and_echo "$ERROR" "Expected container name to be passed into wait_for"
         return 1
     fi
     local COUNTER=0
@@ -213,20 +212,20 @@ wait_for_stopped (){
         sleep 2
     done
     if [ "$STATE" != "Shutdown" ]; then
-        echo -e "${red}Failed to stop instance $WAITING_FOR ${no_color}"
+        log_and_echo "$ERROR" "Failed to stop instance $WAITING_FOR "
         return 1
     else
-        echo -e "Successfully stopped $WAITING_FOR"
+        log_and_echo "Successfully stopped $WAITING_FOR"
     fi
     return 0
 }
 
 deploy_container() {
     local MY_CONTAINER_NAME=$1
-    echo "deploying container ${MY_CONTAINER_NAME}"
+    log_and_echo "deploying container ${MY_CONTAINER_NAME}"
 
     if [ -z MY_CONTAINER_NAME ];then
-        echo -e "${red}No container name was provided${no_color}"
+        log_and_echo "$ERROR" "No container name was provided"
         return 1
     fi
 
@@ -234,31 +233,31 @@ deploy_container() {
     ice inspect ${MY_CONTAINER_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
-        echo -e "${red}${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed${no_color}"
+        log_and_echo "$ERROR" "${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed"
     fi
 
     local BIND_PARMS=""
     # validate the bind_to parameter if one was passed
     if [ ! -z "${BIND_TO}" ]; then
-        echo "Binding to ${BIND_TO}"
+        log_and_echo "Binding to ${BIND_TO}"
         local APP=$(cf env ${BIND_TO})
         local APP_FOUND=$?
         if [ $APP_FOUND -ne 0 ]; then
-            echo -e "${red}${BIND_TO} application not found in space.  Please confirm that you wish to bind the container to the application, and that the application exists${no_color}"
+            log_and_echo "$ERROR" "${BIND_TO} application not found in space.  Please confirm that you wish to bind the container to the application, and that the application exists"
         fi
         local VCAP_SERVICES=$(echo "${APP}" | grep "VCAP_SERVICES")
         local SERVICES_BOUND=$?
         if [ $SERVICES_BOUND -ne 0 ]; then
-            echo -e "${label_color}No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application.${no_color}"
+            log_and_echo "$WARN" "No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
         fi
         BIND_PARMS="--bind ${BIND_TO}"
     fi
     # run the container and check the results
-    echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
+    log_and_echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
     ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} 2> /dev/null
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        echo -e "${red}Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}${no_color}"
+        log_and_echo "$ERROR" "Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}"
         dump_info
         return 1
     fi
@@ -277,13 +276,13 @@ deploy_simple () {
     deploy_container ${MY_CONTAINER_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        echo -e "${red}Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}${no_color}"
+        log_and_echo "$ERROR" "Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}"
         exit $RESULT
     fi
 }
 
 deploy_red_black () {
-    echo -e "${label_color}Example red_black container deploy ${no_color}"
+    log_and_echo "$LABEL" "Example red_black container deploy "
     # deploy new version of the application
     local MY_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     local FLOATING_IP=""
@@ -294,7 +293,7 @@ deploy_red_black () {
         exit $RESULT
     fi
 
-    echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
+    log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
 
     if [ -z "$REMOVE_FROM" ]; then
         COUNTER=${BUILD_NUMBER}
@@ -306,7 +305,7 @@ deploy_red_black () {
         ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log 2> /dev/null
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            echo "Found container ${CONTAINER_NAME}_${COUNTER}"
+            log_and_echo "Found container ${CONTAINER_NAME}_${COUNTER}"
             # does it have a public IP address
             let FOUND+=1
 
@@ -315,26 +314,26 @@ deploy_red_black () {
                 temp="${FLOATING_IP%\"}"
                 FLOATING_IP="${temp#\"}"
                 if [ -n "${FLOATING_IP}" ]; then
-                   echo "Discovered previous IP ${FLOATING_IP}"
+                   log_and_echo "Discovered previous IP ${FLOATING_IP}"
                    IP_JUST_FOUND=$FLOATING_IP
                 fi
             else
-                echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
+                log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
             fi
             if [ "${COUNTER}" -ne "${BUILD_NUMBER}" ]; then
                 # this is a previous deployment
                 if [ -z "${FLOATING_IP}" ]; then
-                    echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"
+                    log_and_echo "${CONTAINER_NAME}_${COUNTER} did not have a floating IP so will need to discover one from previous deployment or allocate one"
                 elif [ -n "${IP_JUST_FOUND}" ]; then
-                    echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
+                    log_and_echo "${CONTAINER_NAME}_${COUNTER} had a floating ip ${FLOATING_IP}"
                     ice ip unbind ${FLOATING_IP} ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
                     sleep 2
                     ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                 fi
                 if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
-                    echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
+                    log_and_echo "keeping previous deployment: ${CONTAINER_NAME}_${COUNTER}"
                 else
-                    echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}"
+                    log_and_echo "removing previous deployment: ${CONTAINER_NAME}_${COUNTER}"
                     ice stop ${CONTAINER_NAME}_${COUNTER}
                     wait_for_stopped ${CONTAINER_NAME}_${COUNTER}
                     ice rm ${CONTAINER_NAME}_${COUNTER} 2> /dev/null
@@ -349,33 +348,33 @@ deploy_red_black () {
     #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log
     #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
     if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then
-        echo "Requesting IP"
+        log_and_echo "Requesting IP"
         FLOATING_IP=$(ice ip request 2> /dev/null | awk '{print $4}' | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
-            echo -e "${label_color}Failed to request new IP address, will attempt to reuse existing IP${no_color}"
+            log_and_echo "$WARN" "Failed to request new IP address, will attempt to reuse existing IP"
             FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[[:space:]]*$' | head -n 1)
             #FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
             #strip off whitespace
             FLOATING_IP=${FLOATING_IP// /}
             if [ -z "${FLOATING_IP}" ];then
-                echo -e "${red}Could not request a new, or reuse existing IP address ${no_color}"
+                log_and_echo "$ERROR" "Could not request a new, or reuse an existing IP address "
                 dump_info
                 exit 1
             else
-                echo "Assigning existing IP address $FLOATING_IP"
+                log_and_echo "Assigning existing IP address $FLOATING_IP"
             fi
         else
             # strip off junk
             temp="${FLOATING_IP%\"}"
             FLOATING_IP="${temp#\"}"
-            echo "Assigning new IP address $FLOATING_IP"
+            log_and_echo "Assigning new IP address $FLOATING_IP"
         fi
         ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
-            echo -e "${red}Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} ${no_color}"
-            echo "Unsetting TEST_URL"
+            log_and_echo "$ERROR" "Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} "
+            log_and_echo "Unsetting TEST_URL"
             export TEST_URL=""
             dump_info
             exit 1
@@ -383,14 +382,14 @@ deploy_red_black () {
     else
         ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
     fi
-    echo "Exporting TEST_URL:${TEST_URL}"
+    log_and_echo "Exporting TEST_URL:${TEST_URL}"
     export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
 
-    echo -e "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
+    log_and_echo "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
 
 clean() {
-    echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
+    log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
 
     if [ -z "$REMOVE_FROM" ]; then
         COUNTER=${BUILD_NUMBER}
@@ -399,32 +398,32 @@ clean() {
     fi
     local FOUND=0
     until [  $COUNTER -lt 1 ]; do
-        echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
+        log_and_echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
         ice inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log
         local RESULT=$?
         if [ $RESULT -eq 0 ]; then
-            echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
+            log_and_echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
             let FOUND+=1
             if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
                 # this is the previous version so keep it around
-                echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
+                log_and_echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
             elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
                 # remove this container
-                echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}"
+                log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}"
                 ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${CONTAINER_NAME}_${COUNTER}
                 sleep 2
-                echo "removing ${CONTAINER_NAME}_${COUNTER}"
+                log_and_echo "removing ${CONTAINER_NAME}_${COUNTER}"
                 ice rm ${CONTAINER_NAME}_${COUNTER}
                 delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
             else
-                echo "removing ${CONTAINER_NAME}_${COUNTER}"
+                log_and_echo "removing ${CONTAINER_NAME}_${COUNTER}"
                 ice rm ${CONTAINER_NAME}_${COUNTER}
                 delete_inventory "ibm_containers" ${CONTAINER_NAME}_${COUNTER}
             fi
         fi
         let COUNTER-=1
     done
-    echo "Cleaned up previous deployments"
+    log_and_echo "Cleaned up previous deployments"
     return 0
 }
 
@@ -462,15 +461,15 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
 fi
 
-echo -e "${label_color}Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}${no_color}"
+log_and_echo "$LABEL" "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then
     clean
 else
-    echo -e "${label_color}Currently only supporting red_black deployment strategy${no_color}"
-    echo -e "${label_color}If you would like another strategy please fork https://github.com/Osthanes/deployscripts.git and submit a pull request${no_color}"
-    echo -e "${label_color}Defaulting to red_black deploy${no_color}"
+    log_and_echo "$WARN" "Currently only supporting red_black deployment strategy"
+    log_and_echo "$WARN" "If you would like another strategy please fork https://github.com/Osthanes/deployscripts.git and submit a pull request"
+    log_and_echo "$WARN" "Defaulting to red_black deploy"
     deploy_red_black
 fi
 dump_info

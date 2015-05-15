@@ -238,7 +238,7 @@ map_url_route_to_container_group (){
                 let COUNTER=COUNTER+1
                 RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
                 if [ "$RESPONSE" -eq 200 ]; then
-                    log_and_echo "$LABEL" "Map requested route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed."
+                    log_and_echo "${green}Map requested route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed.${no_color}"
                     break
                 else
                     log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') does not exist (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
@@ -318,7 +318,7 @@ deploy_group() {
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RESULT=$?
             if [ $RESULT -eq 0 ]; then
-                log_and_echo "$LABEL" "Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
+                log_and_echo "${green}Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
             else
                 if [ $DEBUG -eq 1 ]: then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${HOSTNAME}.${DOMAIN}' command after the deploy completed."

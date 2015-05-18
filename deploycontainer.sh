@@ -26,7 +26,7 @@ dump_info () {
     log_and_echo "$INFO" " $ICEINFO"
 
 
-    local CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
+    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
     # if container limit is disabled no need to check and warn
     if [ ! -z ${CONTAINER_LIMIT} ]; then
         if [ ${CONTAINER_LIMIT} -ge 0 ]; then
@@ -42,7 +42,7 @@ dump_info () {
     fi
 
     # check memory limit, warn user if we're at or approaching the limit
-    local MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
     # if memory limit is disabled no need to check and warn
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then

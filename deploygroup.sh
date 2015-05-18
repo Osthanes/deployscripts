@@ -378,38 +378,27 @@ deploy_red_black () {
 
 clean() {
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
-    local COUNTER=0
-    if [ -z "$REMOVE_FROM" ]; then
-        COUNTER=${BUILD_NUMBER}
-    else
-        COUNTER=$REMOVE_FROM
-    fi
-    local FOUND=0
-    until [  $COUNTER -lt 1 ]; do
-        log_and_echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
-        ice group inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log
-        local RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            log_and_echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
-            let FOUND+=1
-            if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
-                # this is the previous version so keep it around
-                log_and_echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
-            elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
-                # remove this group
-                log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}"
-                ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${CONTAINER_NAME}_${COUNTER}
-                sleep 2
-                log_and_echo "removing group ${CONTAINER_NAME}_${COUNTER}"
-                ice group rm ${CONTAINER_NAME}_${COUNTER}
-                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
-            else
-                log_and_echo "removing group ${CONTAINER_NAME}_${COUNTER}"
-                ice group rm ${CONTAINER_NAME}_${COUNTER}
-                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
-            fi
+    local groupName=""
+    local GROUP_NAME_ARRAY=$(ice group list  | grep a_test_group | awk '{print $2}')
+    for groupName in ${GROUP_NAME_ARRAY[@]}
+    do
+        if [ $groupName == ${CONTAINER_NAME}_$CONCURRENT_VERSIONS ]; then
+            # this is the concurrent version so keep it around
+            log_and_echo "keeping deployment: ${groupName}"
+        elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+            # unmap router and remove the group
+            log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${groupName}"
+            ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
+            sleep 2
+            log_and_echo "removing group ${groupName}"
+            ice group rm ${groupName}
+            delete_inventory "ibm_containers_group" ${groupName}
+        else
+            log_and_echo "removing group ${groupName}"
+            ice group rm ${groupName}
+            delete_inventory "ibm_containers_group" ${groupName}
         fi
-        let COUNTER-=1
+
     done
     log_and_echo "Cleaned up previous deployments"
     return 0

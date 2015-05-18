@@ -92,7 +92,7 @@ update_inventory(){
     # find the container or group id
     if [ "$TYPE" == "ibm_containers" ]; then
         ID=$(ice inspect ${NAME} 2> /dev/null | grep "\"Id\":" | awk '{print $2}')
-        RESULT=$?
+        local RESULT=$?
         if [ $RESULT -ne 0 ]; then
             log_and_echo "$ERROR" "Could not find container called $NAME"
             ice ps 2> /dev/null
@@ -119,9 +119,9 @@ update_inventory(){
 
     # find other inventory information
     log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
-    IDS_INV_URL="${IDS_URL%/}"
-    IDS_REQUEST=$TASK_ID
-    IDS_DEPLOYER=${JOB_NAME##*/}
+    local IDS_INV_URL="${IDS_URL%/}"
+    local IDS_REQUEST=$TASK_ID
+    local IDS_DEPLOYER=${JOB_NAME##*/}
     if [ ! -z "$COPYARTIFACT_BUILD_NUMBER" ] ; then
         IDS_VERSION_TYPE="JENKINS_BUILD_ID"
         IDS_VERSION=$COPYARTIFACT_BUILD_NUMBER
@@ -294,7 +294,7 @@ deploy_red_black () {
     fi
 
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
-
+    local COUNTER=0
     if [ -z "$REMOVE_FROM" ]; then
         COUNTER=${BUILD_NUMBER}
     else
@@ -390,7 +390,7 @@ deploy_red_black () {
 
 clean() {
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
-
+    local COUNTER=0
     if [ -z "$REMOVE_FROM" ]; then
         COUNTER=${BUILD_NUMBER}
     else

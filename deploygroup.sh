@@ -226,7 +226,7 @@ map_url_route_to_container_group (){
     fi
     # Check domain name is valid
     cf check-route ${HOSTNAME} ${DOMAIN} 2>&1> /dev/null
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
         log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"

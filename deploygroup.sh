@@ -91,6 +91,7 @@ update_inventory(){
     fi
     local ID="undefined"
     # find the container or group id
+    local RESULT=0
     if [ "$TYPE" == "ibm_containers" ]; then
         ID=$(ice inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
         RESULT=$?
@@ -127,9 +128,9 @@ update_inventory(){
 
     # find other inventory information
     log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
-    IDS_INV_URL="${IDS_URL%/}"
-    IDS_REQUEST=$TASK_ID
-    IDS_DEPLOYER=${JOB_NAME##*/}
+    local IDS_INV_URL="${IDS_URL%/}"
+    local IDS_REQUEST=$TASK_ID
+    local IDS_DEPLOYER=${JOB_NAME##*/}
     if [ ! -z "$COPYARTIFACT_BUILD_NUMBER" ] ; then
         IDS_VERSION_TYPE="JENKINS_BUILD_ID"
         IDS_VERSION=$COPYARTIFACT_BUILD_NUMBER
@@ -178,9 +179,9 @@ wait_for_group (){
         log_and_echo "$ERROR" "Expected container name to be passed into wait_for"
         return 1
     fi
-    COUNTER=0
-    STATE="unknown"
-    GROUP_LIST_STATE="unknown"
+    local COUNTER=0
+    local STATE="unknown"
+    local GROUP_LIST_STATE="unknown"
     while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") && ("${GROUP_LIST_STATE}" != "CREATE_FAILED") ]]; do
         let COUNTER=COUNTER+1
         STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
@@ -346,7 +347,7 @@ deploy_group() {
 deploy_simple () {
     local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_group ${MY_GROUP_NAME}
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}"
         exit $RESULT
@@ -358,7 +359,7 @@ deploy_red_black () {
     # deploy new version of the application
     local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_group ${MY_GROUP_NAME}
-    RESULT=$?
+    local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
     fi
@@ -377,7 +378,7 @@ deploy_red_black () {
 
 clean() {
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
-
+    local COUNTER=0
     if [ -z "$REMOVE_FROM" ]; then
         COUNTER=${BUILD_NUMBER}
     else

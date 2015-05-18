@@ -437,7 +437,7 @@ if [ -z "$ROUTE_DOMAIN" ]; then
 fi
 
 if [ -z "$CONCURRENT_VERSIONS" ];then
-    export CONCURRENT_VERSIONS=1
+    export CONCURRENT_VERSIONS=$BUILD_NUMBER
 fi
 # Auto_recovery setting
 if [ -z "$AUTO_RECOVERY" ];then

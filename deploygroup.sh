@@ -378,11 +378,19 @@ deploy_red_black () {
 
 clean() {
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
+    local FIND_PREVIOUS="false"
     local groupName=""
-    local GROUP_NAME_ARRAY=$(ice group list  | grep a_test_group | awk '{print $2}')
+    # add the group name that need to keep in an array
+    for (( i = 0 ; i < $CONCURRENT_VERSIONS ; i++ ))
+    do
+        KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
+    done
+    # add the current group in an array of the group name
+    local GROUP_NAME_ARRAY=$(ice group list  | grep ${CONTAINER_NAME} | awk '{print $2}')
+    # loop through the array of the group name and check which one it need to keep
     for groupName in ${GROUP_NAME_ARRAY[@]}
     do
-        if [ $groupName == ${CONTAINER_NAME}_$CONCURRENT_VERSIONS ]; then
+        if [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]];
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${groupName}"
         elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
@@ -393,14 +401,20 @@ clean() {
             log_and_echo "removing group ${groupName}"
             ice group rm ${groupName}
             delete_inventory "ibm_containers_group" ${groupName}
+            FIND_PREVIOUS="true"
         else
             log_and_echo "removing group ${groupName}"
             ice group rm ${groupName}
             delete_inventory "ibm_containers_group" ${groupName}
+            FIND_PREVIOUS="true"
         fi
 
     done
-    log_and_echo "Cleaned up previous deployments"
+    if [ FIND_PREVIOUS="false" ]: then
+        log_and_echo "No any previous deployments found to clean up"
+    else
+        log_and_echo "Cleaned up previous deployments"
+    fi
     return 0
 }
 
@@ -437,7 +451,7 @@ if [ -z "$ROUTE_DOMAIN" ]; then
 fi
 
 if [ -z "$CONCURRENT_VERSIONS" ];then
-    export CONCURRENT_VERSIONS=$BUILD_NUMBER
+    export CONCURRENT_VERSIONS=1
 fi
 # Auto_recovery setting
 if [ -z "$AUTO_RECOVERY" ];then

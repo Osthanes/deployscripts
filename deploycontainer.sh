@@ -412,8 +412,6 @@ clean() {
             log_and_echo "keeping deployment: ${containerName}"
         else
             log_and_echo "removing previous deployment: ${containerName}"
-#            ice stop ${containerName}
-#            wait_for_stopped ${containerName}
             ice rm -f ${containerName} 2> /dev/null
             RESULT=$?
             if [ $RESULT -ne 0 ]; then

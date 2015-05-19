@@ -390,7 +390,7 @@ clean() {
     # loop through the array of the group name and check which one it need to keep
     for groupName in ${GROUP_NAME_ARRAY[@]}
     do
-        if [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]];
+        if [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${groupName}"
         elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then

@@ -293,11 +293,15 @@ deploy_red_black () {
         exit $RESULT
     fi
 
-    # Cleaning up previous deployments."
+    # Cleaning up previous deployments. "
     clean
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         exit $RESULT
+    fi
+    # if we alredy discoved the floating IP in clean(), then we assign it to FLOATING_IP.
+    if [ -n "${DISCOVERED_FLOATING_IP}" ]; then
+        FLOATING_IP=$DISCOVERED_FLOATING_IP
     fi
 
     # check to see that I obtained a floating IP address
@@ -335,8 +339,6 @@ deploy_red_black () {
             dump_info
             exit 1
         fi
-    else
-        ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
     fi
     log_and_echo "Exporting TEST_URL:${TEST_URL}"
     export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
@@ -367,47 +369,53 @@ clean() {
     # loop through the array of the container name and check which one it need to keep
     for containerName in ${CONTAINER_NAME_ARRAY[@]}
     do
-        ice inspect ${containerName} > inspect.log 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            log_and_echo "Found container ${containerName}"
-            # does it have a public IP address
-            if [ -z "${FLOATING_IP}" ]; then
-                FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
-                temp="${FLOATING_IP%\"}"
-                FLOATING_IP="${temp#\"}"
-                if [ -n "${FLOATING_IP}" ]; then
-                   log_and_echo "Discovered previous IP ${FLOATING_IP}"
-                   IP_JUST_FOUND=$FLOATING_IP
-                fi
-            else
-                log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
-            fi
-        fi
-        if [[ "$containerName" != *"$BUILD_NUMBER"* ]]; then
-            # this is a previous deployment
-            if [ -z "${FLOATING_IP}" ]; then
-                log_and_echo "${containerName} did not have a floating IP so will need to discover one from previous deployment or allocate one"
-            elif [ -n "${IP_JUST_FOUND}" ]; then
-                log_and_echo "${containerName} had a floating ip ${FLOATING_IP}"
-                ice ip unbind ${FLOATING_IP} ${containerName} 2> /dev/null
-                RESULT=$?
-                if [ $RESULT -ne 0 ]; then
-                    log_and_echo "$WARN" "'ice ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
-                    log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                    return 0
-                fi
-                sleep 2
-                ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                RESULT=$?
-                if [ $RESULT -ne 0 ]; then
-                    log_and_echo "$WARN" "'ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
-                    log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                    return 0
+        CONTAINER_VERSION_NUMBER=$(echo $containerName | sed 's#.*_##g')
+        if [ $CONTAINER_VERSION_NUMBER -le $BUILD_NUMBER ]; then
+            ice inspect ${containerName} > inspect.log 2> /dev/null
+            RESULT=$?
+            if [ $RESULT -eq 0 ]; then
+                log_and_echo "Found container ${containerName}"
+                # does it have a public IP address
+                if [ -z "${FLOATING_IP}" ]; then
+                    FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
+                    temp="${FLOATING_IP%\"}"
+                    FLOATING_IP="${temp#\"}"
+                    if [ -n "${FLOATING_IP}" ]; then
+                       log_and_echo "Discovered previous IP ${FLOATING_IP}"
+                       IP_JUST_FOUND=$FLOATING_IP
+                    fi
+                else
+                    log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
                 fi
             fi
+            if [[ "$containerName" != *"$BUILD_NUMBER"* ]]; then
+                # this is a previous deployment
+                if [ -z "${FLOATING_IP}" ]; then
+                    log_and_echo "${containerName} did not have a floating IP so will need to discover one from previous deployment or allocate one"
+                elif [ -n "${IP_JUST_FOUND}" ]; then
+                    log_and_echo "${containerName} had a floating ip ${FLOATING_IP}"
+                    ice ip unbind ${FLOATING_IP} ${containerName} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -ne 0 ]; then
+                        log_and_echo "$WARN" "'ice ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                        return 0
+                    fi
+                    sleep 2
+                    ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -ne 0 ]; then
+                        log_and_echo "$WARN" "'ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                        return 0
+                    fi
+                fi
+            fi
         fi
-        if [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${containerName} "* ]]; then
+        if [ $CONTAINER_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
+            log_and_echo "$WARN" "The container ${containerName} version is greater then the current build number ${BUILD_NUMBER} and it will not remove."
+            log_and_echo "$WARN" "You may remove with ice cli command 'ice rm -f ${containerName}'"
+        elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${containerName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${containerName}"
         else
@@ -428,6 +436,12 @@ clean() {
         log_and_echo "No any previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
+    fi
+    if [ -n "${FLOATING_IP}" ]; then
+       log_and_echo "Discovered previous IP ${FLOATING_IP}"
+       export DISCOVERED_FLOATING_IP=$FLOATING_IP
+    else
+       export DISCOVERED_FLOATING_IP=""
     fi
     return 0
 }

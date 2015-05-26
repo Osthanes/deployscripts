@@ -394,10 +394,15 @@ clean() {
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
     fi
+
     # loop through the array of the group name and check which one it need to keep
     for groupName in ${GROUP_NAME_ARRAY[@]}
     do
-        if [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
+        GROUP_VERSION_NUMBER=$(echo $groupName | sed 's#.*_##g')
+        if [ $GROUP_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
+            log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not remove."
+            log_and_echo "$WARN" "You may remove with ice cli command 'ice group rm ${groupName}'"
+        elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${groupName}"
         elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then

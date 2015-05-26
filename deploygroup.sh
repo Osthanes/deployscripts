@@ -378,40 +378,73 @@ deploy_red_black () {
 
 clean() {
     log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
-    local COUNTER=0
-    if [ -z "$REMOVE_FROM" ]; then
-        COUNTER=${BUILD_NUMBER}
-    else
-        COUNTER=$REMOVE_FROM
-    fi
-    local FOUND=0
-    until [  $COUNTER -lt 1 ]; do
-        log_and_echo "Looking for and inspecting ${CONTAINER_NAME}_${COUNTER}"
-        ice group inspect ${CONTAINER_NAME}_${COUNTER} > inspect.log
-        local RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            log_and_echo "Found previous container ${CONTAINER_NAME}_${COUNTER}"
-            let FOUND+=1
-            if [ $FOUND -le $CONCURRENT_VERSIONS ]; then
-                # this is the previous version so keep it around
-                log_and_echo "keeping deployment: ${CONTAINER_NAME}_${COUNTER}"
-            elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
-                # remove this group
-                log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${CONTAINER_NAME}_${COUNTER}"
-                ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${CONTAINER_NAME}_${COUNTER}
-                sleep 2
-                log_and_echo "removing group ${CONTAINER_NAME}_${COUNTER}"
-                ice group rm ${CONTAINER_NAME}_${COUNTER}
-                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
-            else
-                log_and_echo "removing group ${CONTAINER_NAME}_${COUNTER}"
-                ice group rm ${CONTAINER_NAME}_${COUNTER}
-                delete_inventory "ibm_containers_group" ${CONTAINER_NAME}_${COUNTER}
-            fi
-        fi
-        let COUNTER-=1
+    local RESULT=0
+    local FIND_PREVIOUS="false"
+    local groupName=""
+    # add the group name that need to keep in an array
+    for (( i = 0 ; i < $CONCURRENT_VERSIONS ; i++ ))
+    do
+        KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
     done
-    log_and_echo "Cleaned up previous deployments"
+    # add the current group in an array of the group name
+    local GROUP_NAME_ARRAY=$(ice group list  | grep ${CONTAINER_NAME} | awk '{print $2}')
+    RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        log_and_echo "$WARN" "'ice group list' command failed with return code ${RESULT}"
+        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+        return 0
+    fi
+
+    # loop through the array of the group name and check which one it need to keep
+    for groupName in ${GROUP_NAME_ARRAY[@]}
+    do
+        GROUP_VERSION_NUMBER=$(echo $groupName | sed 's#.*_##g')
+        if [ $GROUP_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
+            log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not remove."
+            log_and_echo "$WARN" "You may remove with ice cli command 'ice group rm ${groupName}'"
+        elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
+            # this is the concurrent version so keep it around
+            log_and_echo "keeping deployment: ${groupName}"
+        elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+            # unmap router and remove the group
+            log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${groupName}"
+            ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then
+                log_and_echo "$WARN" "'ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                return 0
+            fi
+            sleep 2
+            log_and_echo "removing group ${groupName}"
+            ice group rm ${groupName}
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then
+                log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                return 0
+            fi
+            delete_inventory "ibm_containers_group" ${groupName}
+            FIND_PREVIOUS="true"
+        else
+            log_and_echo "removing group ${groupName}"
+            ice group rm ${groupName}
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then
+                log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                return 0
+            fi
+            delete_inventory "ibm_containers_group" ${groupName}
+            FIND_PREVIOUS="true"
+        fi
+
+    done
+    if [ FIND_PREVIOUS="false" ]; then
+        log_and_echo "No any previous deployments found to clean up"
+    else
+        log_and_echo "Cleaned up previous deployments"
+    fi
     return 0
 }
 

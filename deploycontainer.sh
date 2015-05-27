@@ -271,7 +271,7 @@ deploy_container() {
         ice rm ${MY_CONTAINER_NAME} 2> /dev/null
         if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
-            log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME is not completed"
+            log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME} is not completed"
         fi
         print_run_fail_msg
     fi

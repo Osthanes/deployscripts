@@ -20,7 +20,7 @@ source $(dirname "$0")/deploy_utilities.sh
 
 print_create_fail_msg () {
     log_and_echo "You can reference to the following steps for troubleshooting of the create group failure."
-    log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space. Than, you may check the output for any information about failure." 
+    log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space. Then, you may check the output for any information about failure." 
     log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
     log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
     log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
@@ -28,7 +28,7 @@ print_create_fail_msg () {
     log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
     log_and_echo "  b. Run and test the container locally using docker cli command"
     log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
-    log_and_echo "      ${green}docker stop myimage mytestcontainer ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
     log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
     log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"

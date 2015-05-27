@@ -356,11 +356,12 @@ deploy_group() {
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
-        log_and_echo "Removing the failed group ${WAITING_FOR}"
+        log_and_echo "Removing the failed group ${MY_GROUP_NAME}"
+        sleep 3
         ice group rm ${WAITING_FOR}
-        if [ $RESULT -ne 0 ]; then
+        if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
-            log_and_echo "$WARN" "Removing the failed group ${WAITING_FOR} is not completed"
+            log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
         fi
         print_create_fail_msg
     else

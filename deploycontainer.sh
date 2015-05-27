@@ -271,7 +271,8 @@ deploy_container() {
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers" ${MY_CONTAINER_NAME}
     elif [ $RESULT -eq 2 ]; then
-        log_and_echo "$ERROR" "Container instance crashed. Removing the crashed container ${MY_CONTAINER_NAME} "
+        log_and_echo "$ERROR" "Container instance crashed."
+        log_and_echo "$WARN" "The container was removed successfully."
         ice rm ${MY_CONTAINER_NAME} 2> /dev/null
         if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"

@@ -344,7 +344,7 @@ deploy_group() {
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
-        log_and_echo "$WARN" "The group '${MY_GROUP_NAME}' was removed successfully."
+        log_and_echo "$WARN" "The group was removed successfully."
         sleep 3
         ice group rm ${MY_GROUP_NAME}
         if [ $? -ne 0 ]; then

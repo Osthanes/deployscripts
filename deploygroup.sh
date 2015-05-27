@@ -18,28 +18,29 @@
 # load helper functions
 source $(dirname "$0")/deploy_utilities.sh
 
+print_create_fail_msg () {
+    log_and_echo "You can reference to the following steps for troubleshooting of the create group failure."
+    log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space. Then, you may check the output for any information about failure." 
+    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+    log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
+    log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
+    log_and_echo "  b. Run and test the container locally using docker cli command"
+    log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
+    log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
+    log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
+    log_and_echo "  d. Run the container group on Bluemix with the 'ice group create' again as explained in step 1."
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
     log_and_echo "Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
     log_and_echo "$ICEINFO"
-
-
-    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    # if container limit is disabled no need to check and warn
-    if [ ! -z ${CONTAINER_LIMIT} ]; then
-        if [ ${CONTAINER_LIMIT} -ge 0 ]; then
-            export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-            local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
-
-            if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-                log_and_echo "$ERROR" "You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers "
-            elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-                log_and_echo "$WARN" "There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}"
-            fi
-        fi
-    fi
 
     # check memory limit, warn user if we're at or approaching the limit
     export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
@@ -190,19 +191,18 @@ wait_for_group (){
             STATE="being placed"
         fi
         if [ "${STATE}x" == "\"CREATE_FAILED\"x" ]; then
-            log_and_echo "$ERROR" "Failed to start group "
-            return 1
+            return 2
         fi
         log_and_echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
     if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
         if [ "$GROUP_LIST_STATE" == "CREATE_FAILED" ]; then
-            log_and_echo "$ERROR" "Failed to create group"
+            return 2
         else
             log_and_echo "$ERROR" "Failed to start group"
+            return 1
         fi
-        return 1
     fi
     return 0
 }
@@ -288,7 +288,7 @@ deploy_group() {
     ice group inspect ${MY_GROUP_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
-        log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists."
+        log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists. Please delete it or run group deployment again."
         exit 1
     fi
 
@@ -338,6 +338,16 @@ deploy_group() {
         else
             log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
+    elif [ $RESULT -eq 2 ]; then
+        log_and_echo "$ERROR" "Failed to create group."
+        log_and_echo "$WARN" "Removing the failed group '${MY_GROUP_NAME}'"
+        sleep 3
+        ice group rm ${MY_GROUP_NAME}
+        if [ $? -ne 0 ]; then
+            log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
+            log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
+        fi
+        print_create_fail_msg
     else
         log_and_echo "$ERROR" "Failed to deploy group"
     fi

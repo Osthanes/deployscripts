@@ -18,28 +18,29 @@
 # load helper functions
 source $(dirname "$0")/deploy_utilities.sh
 
+print_run_fail_msg () {
+    log_and_echo "You can reference to the following steps for troubleshooting of the Container instance crashed."
+    log_and_echo "1. Try to run 'ice run' command with '--verbose' option on your current space or try on another space. Then, you may check the output for any information about failure." 
+    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
+    log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
+    log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
+    log_and_echo "  b. Run and test the container locally using docker cli command"
+    log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
+    log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
+    log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
+    log_and_echo "  d. Run the container on Bluemix with the 'ice run' again as explained in step 1."
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
     log_and_echo "$INFO" " Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
     log_and_echo "$INFO" " $ICEINFO"
-
-
-    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    # if container limit is disabled no need to check and warn
-    if [ ! -z ${CONTAINER_LIMIT} ]; then
-        if [ ${CONTAINER_LIMIT} -ge 0 ]; then
-            export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-            local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
-
-            if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-                log_and_echo "$ERROR" "You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers "
-            elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-                log_and_echo "$WARN" "There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}"
-            fi
-        fi
-    fi
 
     # check memory limit, warn user if we're at or approaching the limit
     export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
@@ -182,9 +183,7 @@ wait_for (){
         sleep 3
     done
     if [ "$STATE" == "Crashed" ]; then
-        log_and_echo "$ERROR" "Container instance crashed. Removing the crashed container ${WAITING_FOR} "
-        ice rm ${WAITING_FOR} 2> /dev/null
-        return 1
+        return 2
     fi
     if [ "$STATE" != "Running" ]; then
         log_and_echo "$ERROR" "Failed to start instance "
@@ -267,6 +266,14 @@ deploy_container() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers" ${MY_CONTAINER_NAME}
+    elif [ $RESULT -eq 2 ]; then
+        log_and_echo "$ERROR" "Container instance crashed. Removing the crashed container ${MY_CONTAINER_NAME} "
+        ice rm ${MY_CONTAINER_NAME} 2> /dev/null
+        if [ $? -ne 0 ]; then
+            log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
+            log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME} is not completed"
+        fi
+        print_run_fail_msg
     fi
     return ${RESULT}
 }

@@ -19,7 +19,7 @@
 source $(dirname "$0")/deploy_utilities.sh
 
 print_create_fail_msg () {
-    log_and_echo "You can reference the following cli commands for troubleshooting of the create group failure."
+    log_and_echo "You can reference to the following steps for troubleshooting of the create group failure."
     log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space. Than, you may check the output for any information about failure." 
     log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
     log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
@@ -356,7 +356,7 @@ deploy_group() {
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
-        log_and_echo "Removing the failed group '${MY_GROUP_NAME}'"
+        log_and_echo "$WARN" "Removing the failed group '${MY_GROUP_NAME}'"
         sleep 3
         ice group rm ${MY_GROUP_NAME}
         if [ $? -ne 0 ]; then

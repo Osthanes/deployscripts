@@ -193,7 +193,7 @@ wait_for (){
         log_and_echo "$ERROR" "Failed to start instance "
         return 1
     fi
-    return 2
+    return 0
 }
 
 # function to wait for a container to start

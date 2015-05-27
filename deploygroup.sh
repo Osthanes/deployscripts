@@ -208,7 +208,7 @@ wait_for_group (){
             return 1
         fi
     fi
-    return 2
+    return 0
 }
 
 # function to map url route the container group

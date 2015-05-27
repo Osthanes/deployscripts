@@ -19,20 +19,19 @@
 source $(dirname "$0")/deploy_utilities.sh
 
 print_create_fail_msg () {
-    blue='\e[0;34m'
     log_and_echo "You can reference the following cli commands for troubleshooting of the create group failure."
     log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space. Than, you may check the output for any information about failure." 
-    log_and_echo "      ${blue}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
     log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
     log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
-    log_and_echo "      ${blue}ice --local pull ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      ${blue}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
     log_and_echo "  b. Run and test the container locally using docker cli command"
-    log_and_echo "      ${blue}docker run --name=mytestcontainer myimage ${no_color}"
-    log_and_echo "      ${blue}docker stop myimage mytestcontainer ${no_color}"
+    log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
+    log_and_echo "      ${green}docker stop myimage mytestcontainer ${no_color}"
     log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
-    log_and_echo "      ${blue}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      ${blue}ice --local push ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
     log_and_echo "  d. Run the container group on Bluemix with the 'ice group create again as explained in step 1."
 }
 
@@ -305,7 +304,7 @@ deploy_group() {
     ice group inspect ${MY_GROUP_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
-        log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists."
+        log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists. Please delete it or run group deployment again."
         exit 1
     fi
 

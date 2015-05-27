@@ -32,7 +32,7 @@ print_create_fail_msg () {
     log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
     log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
-    log_and_echo "  d. Run the container group on Bluemix with the 'ice group create again as explained in step 1."
+    log_and_echo "  d. Run the container group on Bluemix with the 'ice group create' again as explained in step 1."
 }
 
 dump_info () {
@@ -41,22 +41,6 @@ dump_info () {
     log_and_echo "Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
     log_and_echo "$ICEINFO"
-
-
-    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    # if container limit is disabled no need to check and warn
-    if [ ! -z ${CONTAINER_LIMIT} ]; then
-        if [ ${CONTAINER_LIMIT} -ge 0 ]; then
-            export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-            local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
-
-            if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-                log_and_echo "$ERROR" "You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers "
-            elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-                log_and_echo "$WARN" "There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}"
-            fi
-        fi
-    fi
 
     # check memory limit, warn user if we're at or approaching the limit
     export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')

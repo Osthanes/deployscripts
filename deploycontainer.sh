@@ -19,20 +19,24 @@
 source $(dirname "$0")/deploy_utilities.sh
 
 print_run_fail_msg () {
-    log_and_echo "You can reference to the following steps for troubleshooting of the Container instance crashed."
-    log_and_echo "1. Try to run 'ice run' command with '--verbose' option on your current space or try on another space. Then, you may check the output for any information about failure." 
+    log_and_echo "When a container cannot be created, refer to these troubleshooting steps."
+    log_and_echo ""
+    log_and_echo "1. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
     log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
-    log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes."
-    log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
+    log_and_echo ""
+    log_and_echo "2. Test the container locally."
+    log_and_echo "  a. Pull the image to your computer and give it a local tag."
     log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
-    log_and_echo "  b. Run and test the container locally using docker cli command"
+    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes"
     log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
     log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
-    log_and_echo "  c. If you find any issue with image locally, then you can fix and test it by using Docker commands. You can tag and push the new image to your registry:"
+    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry."
     log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
-    log_and_echo "  d. Run the container on Bluemix with the 'ice run' again as explained in step 1."
+    log_and_echo "  d.  Run the container on Bluemix with the 'ice run' command again."
+    log_and_echo ""
+    log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
 }
 
 dump_info () {
@@ -189,7 +193,7 @@ wait_for (){
         log_and_echo "$ERROR" "Failed to start instance "
         return 1
     fi
-    return 0
+    return 2
 }
 
 # function to wait for a container to start

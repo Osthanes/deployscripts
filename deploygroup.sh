@@ -18,6 +18,23 @@
 # load helper functions
 source $(dirname "$0")/deploy_utilities.sh
 
+print_create_fail_msg () {
+    log_and_echo "You can reference the following cli commands for troubleshooting the create group failure."
+    log_and_echo "1. Try to run 'ice group create' command with '--verbose' option on your current space or try on another space with ice command. You may check the output of 'ice group create' command." 
+    log_and_echo "      ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    log_and_echo "2. Try to run container locally, ensuring that it runs for several minutes before you run the container in the cloud."
+    log_and_echo "  a. Pull the ${IMAGE_NAME} image to your computer and create a local tag:"
+    log_and_echo "      ice --local pull ${IMAGE_NAME}"
+    log_and_echo "      ice --local tag -f ${IMAGE_NAME} myimage"
+    log_and_echo "  b. Run and test the container locally using docker cli command"
+    log_and_echo "      docker run myimage"
+    log_and_echo "      docker stop myimage <CONTAINER ID>"
+    log_and_echo "  c. If you find any issue with image locally, then you can  fix and test it by using Docker commands. You can tag and push the new image to your registry:"
+    log_and_echo "      ice --local tag -f myimage:latest ${IMAGE_NAME}"
+    log_and_echo "      ice --local push ${IMAGE_NAME}"
+    log_and_echo "  d. Run the container group on Bluemix with the 'ice group create' as explained in step 1."
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
@@ -190,19 +207,18 @@ wait_for_group (){
             STATE="being placed"
         fi
         if [ "${STATE}x" == "\"CREATE_FAILED\"x" ]; then
-            log_and_echo "$ERROR" "Failed to start group "
-            return 1
+            return 2
         fi
         log_and_echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
     if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
         if [ "$GROUP_LIST_STATE" == "CREATE_FAILED" ]; then
-            log_and_echo "$ERROR" "Failed to create group"
+            return 2
         else
             log_and_echo "$ERROR" "Failed to start group"
+            return 1
         fi
-        return 1
     fi
     return 0
 }
@@ -338,6 +354,15 @@ deploy_group() {
         else
             log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
+    elif [ $RESULT -eq 2 ]; then
+        log_and_echo "$ERROR" "Failed to create group."
+        log_and_echo "Removing the failed group ${WAITING_FOR}"
+        ice group rm ${WAITING_FOR}
+        if [ $RESULT -ne 0 ]; then
+            log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
+            log_and_echo "$WARN" "Removing the failed group ${WAITING_FOR} is not completed"
+        fi
+        print_create_fail_msg
     else
         log_and_echo "$ERROR" "Failed to deploy group"
     fi

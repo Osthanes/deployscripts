@@ -22,7 +22,7 @@ print_run_fail_msg () {
     log_and_echo ""
     log_and_echo "When a container cannot be created, the following are a common set of debugging steps."
     log_and_echo ""
-    log_and_echo "1. Install IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
     log_and_echo ""
     log_and_echo "2. Logging into IBM Container Service."                                  
     log_and_echo "      ${green}ice login ${no_color}"
@@ -207,7 +207,7 @@ wait_for (){
         log_and_echo "$ERROR" "Failed to start instance "
         return 1
     fi
-    return 2
+    return 0
 }
 
 # function to wait for a container to start

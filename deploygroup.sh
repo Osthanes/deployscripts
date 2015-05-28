@@ -47,7 +47,7 @@ print_create_fail_msg () {
     log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice group create' command to determine if the container group will now run on Bluemix."
     log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
     log_and_echo ""
-    log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline"
+    log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
     log_and_echo ""
     log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
     log_and_echo ""

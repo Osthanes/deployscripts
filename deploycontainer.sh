@@ -18,28 +18,47 @@
 # load helper functions
 source $(dirname "$0")/deploy_utilities.sh
 
+print_run_fail_msg () {
+    log_and_echo ""
+    log_and_echo "When a container cannot be created, the following are a common set of debugging steps."
+    log_and_echo ""
+    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    log_and_echo ""
+    log_and_echo "2. Logging into IBM Container Service."                                  
+    log_and_echo "      ${green}ice login ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}cf login ${no_color}"
+    log_and_echo ""
+    log_and_echo "2. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
+    log_and_echo ""
+    log_and_echo "3. Test the container locally."
+    log_and_echo "  a. Pull the image to your computer."
+    log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
+    log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
+    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry.  For example: "
+    log_and_echo "      [fix and update your local Dockerfile]"
+    log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
+    log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
+    log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
+    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
+    log_and_echo ""
+    log_and_echo "4. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
+    log_and_echo ""
+    log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
+    log_and_echo ""
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
     log_and_echo "$INFO" " Summary:"
     local ICEINFO=$(ice info 2>/dev/null)
     log_and_echo "$INFO" " $ICEINFO"
-
-
-    export CONTAINER_LIMIT=$(echo "$ICEINFO" | grep "Containers limit" | awk '{print $4}')
-    # if container limit is disabled no need to check and warn
-    if [ ! -z ${CONTAINER_LIMIT} ]; then
-        if [ ${CONTAINER_LIMIT} -ge 0 ]; then
-            export CONTAINER_COUNT=$(echo "$ICEINFO" | grep "Containers usage" | awk '{print $4}')
-            local WARNING_LEVEL="$(echo "$CONTAINER_LIMIT - 2" | bc)"
-
-            if [ ${CONTAINER_COUNT} -ge ${CONTAINER_LIMIT} ]; then
-                log_and_echo "$ERROR" "You have ${CONTAINER_COUNT} containers running, and may reached the default limit on the number of containers "
-            elif [ ${CONTAINER_COUNT} -ge ${WARNING_LEVEL} ]; then
-                log_and_echo "$WARN" "There are ${CONTAINER_COUNT} containers running, which is approaching the limit of ${CONTAINER_LIMIT}"
-            fi
-        fi
-    fi
 
     # check memory limit, warn user if we're at or approaching the limit
     export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
@@ -182,9 +201,7 @@ wait_for (){
         sleep 3
     done
     if [ "$STATE" == "Crashed" ]; then
-        log_and_echo "$ERROR" "Container instance crashed. Removing the crashed container ${WAITING_FOR} "
-        ice rm ${WAITING_FOR} 2> /dev/null
-        return 1
+        return 2
     fi
     if [ "$STATE" != "Running" ]; then
         log_and_echo "$ERROR" "Failed to start instance "
@@ -267,6 +284,15 @@ deploy_container() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers" ${MY_CONTAINER_NAME}
+    elif [ $RESULT -eq 2 ]; then
+        log_and_echo "$ERROR" "Container instance crashed."
+        log_and_echo "$WARN" "The container was removed successfully."
+        ice rm ${MY_CONTAINER_NAME} 2> /dev/null
+        if [ $? -ne 0 ]; then
+            log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
+            log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME} is not completed"
+        fi
+        print_run_fail_msg
     fi
     return ${RESULT}
 }

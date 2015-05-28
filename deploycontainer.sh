@@ -19,24 +19,38 @@
 source $(dirname "$0")/deploy_utilities.sh
 
 print_run_fail_msg () {
-    log_and_echo "When a container cannot be created, refer to these troubleshooting steps."
     log_and_echo ""
-    log_and_echo "1. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+    log_and_echo "When a container cannot be created, the following are a common set of debugging steps."
+    log_and_echo ""
+    log_and_echo "1. Install IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    log_and_echo ""
+    log_and_echo "2. Logging into IBM Container Service."                                  
+    log_and_echo "      ${green}ice login ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}cf login ${no_color}"
+    log_and_echo ""
+    log_and_echo "2. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
     log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
     log_and_echo ""
-    log_and_echo "2. Test the container locally."
-    log_and_echo "  a. Pull the image to your computer and give it a local tag."
+    log_and_echo "3. Test the container locally."
+    log_and_echo "  a. Pull the image to your computer."
+    log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      or" 
     log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      ${green}ice --local tag -f ${IMAGE_NAME} myimage ${no_color}"
-    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes"
-    log_and_echo "      ${green}docker run --name=mytestcontainer myimage ${no_color}"
+    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
+    log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
-    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry."
-    log_and_echo "      ${green}ice --local tag -f myimage:latest ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      ${green}ice --local push ${IMAGE_NAME} ${no_color}"
-    log_and_echo "  d.  Run the container on Bluemix with the 'ice run' command again."
+    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry.  For example: "
+    log_and_echo "      [fix and update your local Dockerfile]"
+    log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
+    log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
+    log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
+    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
+    log_and_echo ""
+    log_and_echo "4. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline"
     log_and_echo ""
     log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
+    log_and_echo ""
 }
 
 dump_info () {
@@ -193,7 +207,7 @@ wait_for (){
         log_and_echo "$ERROR" "Failed to start instance "
         return 1
     fi
-    return 0
+    return 2
 }
 
 # function to wait for a container to start

@@ -24,7 +24,7 @@ print_run_fail_msg () {
     log_and_echo ""
     log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
     log_and_echo ""
-    log_and_echo "2. Logging into IBM Container Service."                                  
+    log_and_echo "2. Log into IBM Container Service."                                  
     log_and_echo "      ${green}ice login ${no_color}"
     log_and_echo "      or" 
     log_and_echo "      ${green}cf login ${no_color}"
@@ -265,7 +265,7 @@ deploy_container() {
         local VCAP_SERVICES=$(echo "${APP}" | grep "VCAP_SERVICES")
         local SERVICES_BOUND=$?
         if [ $SERVICES_BOUND -ne 0 ]; then
-            log_and_echo "$WARN" "No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
+            log_and_echo "$WARN" "No services appear to be bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
         fi
         BIND_PARMS="--bind ${BIND_TO}"
     fi
@@ -439,8 +439,8 @@ clean() {
             fi
         fi
         if [ $CONTAINER_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
-            log_and_echo "$WARN" "The container ${containerName} version is greater then the current build number ${BUILD_NUMBER} and it will not remove."
-            log_and_echo "$WARN" "You may remove with ice cli command 'ice rm -f ${containerName}'"
+            log_and_echo "$WARN" "The container ${containerName} version is greater then the current build number ${BUILD_NUMBER} and it will not be removed."
+            log_and_echo "$WARN" "You may remove it with the ice cli command 'ice rm -f ${containerName}'"
         elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${containerName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${containerName}"

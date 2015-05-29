@@ -24,13 +24,13 @@ print_create_fail_msg () {
     log_and_echo ""
     log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
     log_and_echo ""
-    log_and_echo "2. Logging into IBM Container Service."                                  
+    log_and_echo "2. Log into IBM Container Service."                                  
     log_and_echo "      ${green}ice login ${no_color}"
     log_and_echo "      or" 
     log_and_echo "      ${green}cf login ${no_color}"
     log_and_echo ""
     log_and_echo "3. Run 'ice group create --verbose' in your current space or try it on another space. Check the output for information about the failure." 
-    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
     log_and_echo ""
     log_and_echo "4. Test the container locally."
     log_and_echo "  a. Pull the image to your computer."
@@ -45,7 +45,7 @@ print_create_fail_msg () {
     log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
     log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
     log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice group create' command to determine if the container group will now run on Bluemix."
-    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
+    log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
     log_and_echo ""
     log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
     log_and_echo ""
@@ -255,7 +255,7 @@ map_url_route_to_container_group (){
             # loop until the route to container group success with retun code 200 or time-out.
             local COUNTER=0
             local RESPONSE="0"
-            log_and_echo "Wating to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
+            log_and_echo "Waiting to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
             if [ "${DEBUG}x" != "1x" ]; then
                 local TIME_OUT=6
             else
@@ -322,13 +322,13 @@ deploy_group() {
         local VCAP_SERVICES=$(echo "${APP}" | grep "VCAP_SERVICES")
         local SERVICES_BOUND=$?
         if [ $SERVICES_BOUND -ne 0 ]; then
-            log_and_echo "$WARN" "No services appear bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
+            log_and_echo "$WARN" "No services appear to be bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
         fi
         BIND_PARMS="--bind ${BIND_TO}"
     fi
     # create the group and check the results
-    log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}"
@@ -345,7 +345,7 @@ deploy_group() {
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RET=$?
             if [ $RET -eq 0 ]; then
-                log_and_echo "${green}Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
+                log_and_echo "${green}Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
             else
                 if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
@@ -428,8 +428,8 @@ clean() {
     do
         GROUP_VERSION_NUMBER=$(echo $groupName | sed 's#.*_##g')
         if [ $GROUP_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
-            log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not remove."
-            log_and_echo "$WARN" "You may remove with ice cli command 'ice group rm ${groupName}'"
+            log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not be removed."
+            log_and_echo "$WARN" "You may remove it with the ice cli command 'ice group rm ${groupName}'"
         elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${groupName}"
@@ -469,7 +469,7 @@ clean() {
 
     done
     if [ FIND_PREVIOUS="false" ]; then
-        log_and_echo "No any previous deployments found to clean up"
+        log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
     fi
@@ -488,8 +488,21 @@ check_num='^[0-9]+$'
 if [ -z "$DESIRED_INSTANCES" ]; then
     export DESIRED_INSTANCES=1
 elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
-    log_and_echo "$WARN" "DESIRED_INSTANCES value is not a number, defaulting to 1 and continue deploy process."
+    log_and_echo "$WARN" "DESIRED_INSTANCES value is not a number, defaulting to 1 and continuing deploy process."
     export DESIRED_INSTANCES=1
+fi
+
+check_num='^[0-9]+$'
+if [ -z "$MAX_INSTANCES" ]; then
+    export MAX_INSTANCES=2
+elif ! [[ "$MAX_INSTANCES" =~ $check_num ]] ; then
+    log_and_echo "$WARN" "MAX_INSTANCES value is not a number, defaulting to 2 and continuing deploy process."
+    export MAX_INSTANCES=2
+fi
+
+if [ $MAX_INSTANCES -lt $DESIRED_INSTANCES ]; then
+    log_and_echo "$WARN" "DESIRED_INSTANCES is less than MAX_INSTANCES.  Adjusting MAX to be equal to DESIRED."
+    export MAX_INSTANCES=$DESIRED_INSTANCES
 fi
 
 # set the port numbers with --publish

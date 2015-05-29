@@ -255,7 +255,7 @@ map_url_route_to_container_group (){
             # loop until the route to container group success with retun code 200 or time-out.
             local COUNTER=0
             local RESPONSE="0"
-            log_and_echo "Wating to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
+            log_and_echo "Waiting to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
             if [ "${DEBUG}x" != "1x" ]; then
                 local TIME_OUT=6
             else
@@ -345,7 +345,7 @@ deploy_group() {
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RET=$?
             if [ $RET -eq 0 ]; then
-                log_and_echo "${green}Succefully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
+                log_and_echo "${green}Successfully map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
             else
                 if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
@@ -469,7 +469,7 @@ clean() {
 
     done
     if [ FIND_PREVIOUS="false" ]; then
-        log_and_echo "No any previous deployments found to clean up"
+        log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
     fi

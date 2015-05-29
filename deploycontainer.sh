@@ -459,7 +459,7 @@ clean() {
         IP_JUST_FOUND=""
     done
     if [ FIND_PREVIOUS="false" ]; then
-        log_and_echo "No any previous deployments found to clean up"
+        log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
     fi

@@ -24,7 +24,7 @@ print_create_fail_msg () {
     log_and_echo ""
     log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
     log_and_echo ""
-    log_and_echo "2. Logging into IBM Container Service."                                  
+    log_and_echo "2. Log into IBM Container Service."                                  
     log_and_echo "      ${green}ice login ${no_color}"
     log_and_echo "      or" 
     log_and_echo "      ${green}cf login ${no_color}"

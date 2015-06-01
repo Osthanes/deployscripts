@@ -70,6 +70,11 @@ fi
 
 ###################################################################
 # get list of container data in json format
+#   this function gets the container data in json format for the given deployment_method type.
+# input: 
+#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
+# output:
+#   data: container data in json
 ###################################################################
 get_all_container_data_json() {
     local deployment_method=$1
@@ -91,19 +96,26 @@ get_all_container_data_json() {
 }
 
 ###################################################################
-# get_list_container_value_for_given_key
+# get_list_container_value_for_given_attribute
+#   this function will search for the list of the container value of the give attribute.
+# input: 
+#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
+#   attribute: the attribute of the container data
+#   search_value: part of the value that used for the search
+# output:
+#   container_value_list: array of the value for the give key and given the search_value
 ###################################################################
-get_list_container_value_for_given_key() {
+get_list_container_value_for_given_attribute() {
     local deployment_method=$1
-    local key=$2
+    local attribute=$2
     local search_value=$3
-    if [ -z "${deployment_method}" ] || [ -z "${key}" ] || [ -z "${search_value}" ]; then
+    if [ -z "${deployment_method}" ] || [ -z "${attribute}" ] || [ -z "${search_value}" ]; then
         return 1
     fi
     local counter=0
     local index=2
     local container_data="unknown"
-    export container_name_list=()
+    export container_value_list=()
     local container_data_list=$(get_all_container_data_json ${deployment_method})
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
@@ -115,21 +127,29 @@ get_list_container_value_for_given_key() {
         if [ -z "${container_data}" ]; then
             break
         fi
-        local container_name=$(echo $container_data | awk -F''$key'":' '{print $2;}' | awk -F'"' '{print $2;}') 
+        local container_name=$(echo $container_data | awk -F''$attribute'":' '{print $2;}' | awk -F'"' '{print $2;}') 
         if [ "${container_name%_*}" == "${search_value}" ]; then
-    	    container_name_list[$counter]=$container_name
+    	    container_value_list[$counter]=$container_name
         fi
         let counter=counter+1;
         let index=index+2;
     done 
-    echo ${container_name_list[@]}
+    echo ${container_value_list[@]}
     return 0
 }
 
 ###################################################################
-# get_container_value_for_given_key
+# get_container_value_for_given_attribute
+#   this function will search for the value of the give attribute of the container data formatted in json.
+# input: 
+#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
+#   attribute: the attribute of the container data
+#   value: value of the give attribute
+#   search_attribute: the attribute that used to find the require value
+# output:
+#   require_value: the value for the give search_attribute
 ###################################################################
-get_container_value_for_given_key() {
+get_container_value_for_given_attribute() {
     local deployment_method=$1
     local attribute=$2
     local value=$3

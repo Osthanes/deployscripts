@@ -125,7 +125,7 @@ update_inventory(){
         RESULT=$?
         if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
             # get continer Id: deployment_method="${TYPE}", attribute="Name", value="${NAME}", search_attribute="Id"
-            get_container_value_for_given_key ${TYPE} "Name" ${NAME} "Id"
+            get_container_value_for_given_attribute ${TYPE} "Name" ${NAME} "Id"
             RESULT=$?
             if [ $RESULT -ne 0 ] || [ -z "${require_value}" ]; then
                 log_and_echo "$ERROR" "Could not find group called $NAME"
@@ -206,7 +206,7 @@ wait_for_group (){
         STATUS=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATUS}" ]; then
             # get continer status: deployment_method="ibm_containers_group", attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
-            get_container_value_for_given_key "ibm_containers_group" "Name" ${WAITING_FOR} "Status"
+            get_container_value_for_given_attribute "ibm_containers_group" "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
         fi
         log_and_echo "${WAITING_FOR} is ${STATUS}"
@@ -411,8 +411,8 @@ clean() {
         KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
     done
     # add the current group in an array of the group name
-    # get list of the continer name by given deployment_method="ibm_containers_group", key=Name and search_value=${CONTAINER_NAME}
-    GROUP_NAME_ARRAY=$(get_list_container_value_for_given_key "ibm_containers_group" "Name" ${CONTAINER_NAME})
+    # get list of the continer name by given deployment_method="ibm_containers_group", attribute="Name" and search_value=${CONTAINER_NAME}
+    GROUP_NAME_ARRAY=$(get_list_container_value_for_given_attribute "ibm_containers_group" "Name" ${CONTAINER_NAME})
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$WARN" "'ice --verbose group list' command failed with return code ${RESULT}"

@@ -69,6 +69,106 @@ fi
 
 
 ###################################################################
+# get list of container data in json format
+###################################################################
+get_all_container_data_json() {
+    local deployment_method=$1
+    local data=""
+    if [ -z "${deployment_method}" ]; then
+        return 1
+    elif [ "$deployment_method" == "ibm_containers_group" ]; then
+        data=$(ice --verbose group list  | sed -n '/{/,/}/p')
+    elif [ "$deployment_method" == "ibm_containers" ]; then
+        data=$(ice --verbose list  | sed -n '/{/,/}/p')
+    fi
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
+        return 1
+    else
+        echo ${data}
+        return 0
+    fi
+}
+
+###################################################################
+# get_list_container_value_for_given_key
+###################################################################
+get_list_container_value_for_given_key() {
+    local deployment_method=$1
+    local key=$2
+    local search_value=$3
+    if [ -z "${deployment_method}" ] || [ -z "${key}" ] || [ -z "${search_value}" ]; then
+        return 1
+    fi
+    local counter=0
+    local index=2
+    local container_data="unknown"
+    export container_name_list=()
+    local container_data_list=$(get_all_container_data_json ${deployment_method})
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
+        return 1
+    fi
+    while :
+    do   
+        local container_data=$(echo $container_data_list | awk -F'[{}]' '{print $'$index';}')
+        if [ -z "${container_data}" ]; then
+            break
+        fi
+        local container_name=$(echo $container_data | awk -F''$key'":' '{print $2;}' | awk -F'"' '{print $2;}') 
+        if [ "${container_name%_*}" == "${search_value}" ]; then
+    	    container_name_list[$counter]=$container_name
+        fi
+        let counter=counter+1;
+        let index=index+2;
+    done 
+    echo ${container_name_list[@]}
+    return 0
+}
+
+###################################################################
+# get_container_value_for_given_key
+###################################################################
+get_container_value_for_given_key() {
+    local deployment_method=$1
+    local attribute=$2
+    local value=$3
+    local search_attribute=$4
+    if [ -z "${deployment_method}" ] || [ -z "${attribute}" ] || [ -z "${value}" ] || [ -z "${search_attribute}" ]; then
+        return 1
+    fi
+    local index=2
+    local container_data="unknown"
+    local container_data_list=$(get_all_container_data_json ${deployment_method})
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
+        return 1
+    fi
+    while :
+    do   
+        local container_data=$(echo $container_data_list | awk -F'[{}]' '{print $'$index';}')
+        if [ -z "${container_data}" ]; then
+            log_and_echo "$ERROR" "Container ${value} does not exist in output of the 'ice --verbose group list' command."
+            break
+        fi
+        local container_name=$(echo $container_data | awk -F''$attribute'":' '{print $2;}' | awk -F'"' '{print $2;}') 
+        if [ "${container_name}" == "${value}" ]; then
+            export require_value=$(echo $container_data | awk -F''$search_attribute'":' '{print $2;}' | awk -F'"' '{print $2;}')
+            RESULT=$?
+            if [ $RESULT -ne 0 ] || [ -z "${require_value}" ]; then
+                log_and_echo "$ERROR" "Failed to get ${search_attribute} value, return code = ${RESULT}"
+                return 1
+            else
+    	        return 0
+            fi
+        fi            
+        let index=index+2;
+    done 
+    export require_value=""
+    return 1
+}
+
+###################################################################
 # get port numbers
 ###################################################################
 get_port_numbers() {

@@ -70,22 +70,12 @@ fi
 
 ###################################################################
 # get list of container data in json format
-#   this function gets the container data in json format for the given deployment_method type.
-# input: 
-#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
+#   this function gets the group container data in json format.
 # output:
-#   data: container data in json
+#   data: group container data in json
 ###################################################################
-get_all_container_data_json() {
-    local deployment_method=$1
-    local data=""
-    if [ -z "${deployment_method}" ]; then
-        return 1
-    elif [ "$deployment_method" == "ibm_containers_group" ]; then
-        data=$(ice --verbose group list  | sed -n '/{/,/}/p')
-    elif [ "$deployment_method" == "ibm_containers" ]; then
-        data=$(ice --verbose ps  | sed -n '/{/,/}/p')
-    fi
+get_group_container_data_json() {
+    local data=$(ice --verbose group list  | sed -n '/{/,/}/p')
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
         return 1
@@ -96,27 +86,25 @@ get_all_container_data_json() {
 }
 
 ###################################################################
-# get_list_container_value_for_given_attribute
-#   this function will search for the list of the container value of the give attribute.
+# get_list_container_group_value_for_given_attribute
+#   this function will search for the list of the container group value of the give attribute.
 # input: 
-#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
 #   attribute: the attribute of the container data
 #   search_value: part of the value that used for the search
 # output:
 #   container_value_list: array of the value for the give key and given the search_value
 ###################################################################
-get_list_container_value_for_given_attribute() {
-    local deployment_method=$1
-    local attribute=$2
-    local search_value=$3
-    if [ -z "${deployment_method}" ] || [ -z "${attribute}" ] || [ -z "${search_value}" ]; then
+get_list_container_group_value_for_given_attribute() {
+    local attribute=$1
+    local search_value=$2
+    if [ -z "${attribute}" ] || [ -z "${search_value}" ]; then
         return 1
     fi
     local counter=0
     local index=2
     local container_data="unknown"
     export container_value_list=()
-    local container_data_list=$(get_all_container_data_json ${deployment_method})
+    local container_data_list=$(get_group_container_data_json)
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
         return 1
@@ -139,27 +127,25 @@ get_list_container_value_for_given_attribute() {
 }
 
 ###################################################################
-# get_container_value_for_given_attribute
+# get_container_group_value_for_given_attribute
 #   this function will search for the value of the give attribute of the container data formatted in json.
 # input: 
-#   deployment_method: The type of deployment ("ibm_containers_group", or "ibm_containers")
 #   attribute: the attribute of the container data
 #   value: value of the give attribute
 #   search_attribute: the attribute that used to find the require value
 # output:
 #   require_value: the value for the give search_attribute
 ###################################################################
-get_container_value_for_given_attribute() {
-    local deployment_method=$1
-    local attribute=$2
-    local value=$3
-    local search_attribute=$4
-    if [ -z "${deployment_method}" ] || [ -z "${attribute}" ] || [ -z "${value}" ] || [ -z "${search_attribute}" ]; then
+get_container_group_value_for_given_attribute() {
+    local attribute=$1
+    local value=$2
+    local search_attribute=$3
+    if [ -z "${attribute}" ] || [ -z "${value}" ] || [ -z "${search_attribute}" ]; then
         return 1
     fi
     local index=2
     local container_data="unknown"
-    local container_data_list=$(get_all_container_data_json ${deployment_method})
+    local container_data_list=$(get_group_container_data_json)
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
         return 1

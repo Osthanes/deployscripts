@@ -84,7 +84,7 @@ get_all_container_data_json() {
     elif [ "$deployment_method" == "ibm_containers_group" ]; then
         data=$(ice --verbose group list  | sed -n '/{/,/}/p')
     elif [ "$deployment_method" == "ibm_containers" ]; then
-        data=$(ice --verbose list  | sed -n '/{/,/}/p')
+        data=$(ice --verbose ps  | sed -n '/{/,/}/p')
     fi
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then

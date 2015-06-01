@@ -124,14 +124,15 @@ update_inventory(){
         ID=$(ice group inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
         RESULT=$?
         if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
-            local GROUP_LIST_STATE=$(ice group list  | grep ${NAME} | awk '{print $3}')
+            # get continer Id: attribute="Name", value="${NAME}", search_attribute="Id"
+            get_container_group_value_for_given_attribute "Name" ${NAME} "Id"
             RESULT=$?
-            if [ $RESULT -ne 0 ] || [ -z "${GROUP_LIST_STATE}" ]; then
+            if [ $RESULT -ne 0 ] || [ -z "${require_value}" ]; then
                 log_and_echo "$ERROR" "Could not find group called $NAME"
                 ice group list
                 return 1
             else
-                ID=$(ice group list  | grep ${NAME} | awk '{print $1}')
+                ID=$require_value
             fi
         fi
     else
@@ -199,30 +200,25 @@ wait_for_group (){
         return 1
     fi
     local COUNTER=0
-    local STATE="unknown"
-    local GROUP_LIST_STATE="unknown"
-    while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "\"CREATE_COMPLETE\"") && ("${GROUP_LIST_STATE}" != "CREATE_FAILED") ]]; do
+    local STATUS="unknown"
+    while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        STATE=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
-        GROUP_LIST_STATE=$(ice group list  | grep ${WAITING_FOR} | awk '{print $3}')
-        if [ -z "${STATE}" ]; then
-            STATE="being placed"
+        STATUS=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        if [ -z "${STATUS}" ]; then
+            # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
+            get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
+            STATUS=$require_value
         fi
-        if [ "${STATE}x" == "\"CREATE_FAILED\"x" ]; then
+        log_and_echo "${WAITING_FOR} is ${STATUS}"
+        if [ "${STATUS}" == "CREATE_COMPLETE" ] || [ "${STATUS}" == "\"CREATE_COMPLETE\"" ]; then
+            return 0
+        elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
             return 2
         fi
-        log_and_echo "${WAITING_FOR} is ${STATE}"
         sleep 3
     done
-    if [ "$STATE" != "\"CREATE_COMPLETE\"" ]; then
-        if [ "$GROUP_LIST_STATE" == "CREATE_FAILED" ]; then
-            return 2
-        else
-            log_and_echo "$ERROR" "Failed to start group"
-            return 1
-        fi
-    fi
-    return 0
+    log_and_echo "$ERROR" "Failed to start group"
+    return 1
 }
 
 # function to map url route the container group
@@ -415,10 +411,11 @@ clean() {
         KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
     done
     # add the current group in an array of the group name
-    local GROUP_NAME_ARRAY=$(ice group list  | grep ${CONTAINER_NAME} | awk '{print $2}')
+    # get list of the continer name by given attribute="Name" and search_value=${CONTAINER_NAME}
+    GROUP_NAME_ARRAY=$(get_list_container_group_value_for_given_attribute "Name" ${CONTAINER_NAME})
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        log_and_echo "$WARN" "'ice group list' command failed with return code ${RESULT}"
+        log_and_echo "$WARN" "'ice --verbose group list' command failed with return code ${RESULT}"
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
     fi

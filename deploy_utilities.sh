@@ -69,6 +69,112 @@ fi
 
 
 ###################################################################
+# get list of container data in json format
+#   this function gets the group container data in json format.
+# output:
+#   data: group container data in json
+###################################################################
+get_group_container_data_json() {
+    local data=$(ice --verbose group list  | sed -n '/{/,/}/p')
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
+        return 1
+    else
+        echo ${data}
+        return 0
+    fi
+}
+
+###################################################################
+# get_list_container_group_value_for_given_attribute
+#   this function will search for the list of the container group value of the give attribute.
+# input: 
+#   attribute: the attribute of the container data
+#   search_value: part of the value that used for the search
+# output:
+#   container_value_list: array of the value for the give key and given the search_value
+###################################################################
+get_list_container_group_value_for_given_attribute() {
+    local attribute=$1
+    local search_value=$2
+    if [ -z "${attribute}" ] || [ -z "${search_value}" ]; then
+        return 1
+    fi
+    local counter=0
+    local index=2
+    local container_data="unknown"
+    export container_value_list=()
+    local container_data_list=$(get_group_container_data_json)
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
+        return 1
+    fi
+    while :
+    do   
+        local container_data=$(echo $container_data_list | awk -F'[{}]' '{print $'$index';}')
+        if [ -z "${container_data}" ]; then
+            break
+        fi
+        local container_name=$(echo $container_data | awk -F''$attribute'":' '{print $2;}' | awk -F'"' '{print $2;}') 
+        if [ "${container_name%_*}" == "${search_value}" ]; then
+    	    container_value_list[$counter]=$container_name
+        fi
+        let counter=counter+1;
+        let index=index+2;
+    done 
+    echo ${container_value_list[@]}
+    return 0
+}
+
+###################################################################
+# get_container_group_value_for_given_attribute
+#   this function will search for the value of the give attribute of the container data formatted in json.
+# input: 
+#   attribute: the attribute of the container data
+#   value: value of the give attribute
+#   search_attribute: the attribute that used to find the require value
+# output:
+#   require_value: the value for the give search_attribute
+###################################################################
+get_container_group_value_for_given_attribute() {
+    local attribute=$1
+    local value=$2
+    local search_attribute=$3
+    if [ -z "${attribute}" ] || [ -z "${value}" ] || [ -z "${search_attribute}" ]; then
+        return 1
+    fi
+    local index=2
+    local container_data="unknown"
+    local container_data_list=$(get_group_container_data_json)
+    local RESULT=$?
+    if [ $RESULT -ne 0 ] || [ -z "${container_data_list}" ]; then
+        return 1
+    fi
+    while :
+    do   
+        local container_data=$(echo $container_data_list | awk -F'[{}]' '{print $'$index';}')
+        if [ -z "${container_data}" ]; then
+            log_and_echo "$ERROR" "Container ${value} does not exist in output of the 'ice --verbose group list' command."
+            break
+        fi
+        local container_name=$(echo $container_data | awk -F''$attribute'":' '{print $2;}' | awk -F'"' '{print $2;}') 
+        if [ "${container_name}" == "${value}" ]; then
+            export require_value=$(echo $container_data | awk -F''$search_attribute'":' '{print $2;}' | awk -F'"' '{print $2;}')
+            RESULT=$?
+            if [ $RESULT -ne 0 ] || [ -z "${require_value}" ]; then
+                log_and_echo "$ERROR" "Failed to get ${search_attribute} value, return code = ${RESULT}"
+                return 1
+            else
+    	        return 0
+            fi
+        fi            
+        let index=index+2;
+    done 
+    export require_value=""
+    return 1
+}
+
+###################################################################
 # get port numbers
 ###################################################################
 get_port_numbers() {

@@ -327,7 +327,7 @@ deploy_group() {
     # find the space line from bluemix, get the last entry on that line, minus the parens around it
     local space_guid=$(ice info | grep "Bluemix Space" | awk '{print $NF}' | sed 's/.//;s/.$//;')
     if [ -n ${space_guid} ]; then
-        local space_guid_env="--env \"space_id=${space_guid}\""
+        local space_guid_env="--env space_id=${space_guid}"
     fi
 
     # create the group and check the results

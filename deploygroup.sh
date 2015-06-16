@@ -240,8 +240,20 @@ map_url_route_to_container_group (){
         return 1
     fi
     # Check domain name is valid
-    cf check-route ${HOSTNAME} ${DOMAIN} 2>&1> /dev/null
-    local RESULT=$?
+    # This check is not very useful ... it resturns 0 all the time and just indicates if the route is already created 
+    cf check-route ${HOSTNAME} ${DOMAIN} | grep "does exist"
+    local ROUTE_EXISTS=$?
+    if [ ROUTE_EXISTS -ne 0 ]; then 
+        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}')
+        log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
+        cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
+        debugme cf routes
+        RESULT=$?
+    else 
+        log_and_echo "Route already created for ${HOSTNAME} ${DOMAIN}"
+        local RESULT=0
+    fi 
+
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
         log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
@@ -344,6 +356,21 @@ deploy_group() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
+
+        # generate a route if one does not exist 
+        if [ -z "${ROUTE_DOMAIN}" ]; then 
+            export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
+            log_and_echo "$WARN" "No domain specified.  To set this create environment property ROUTE_DOMAIN on the environment property for the stage.  Using $ROUTE_DOMAIN by default"
+        fi 
+
+        # if the user has not defined a Route then create one
+        if [ -z "${ROUTE_HOSTNAME}" ]; then
+            local GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
+            local MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
+            MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
+            export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+        fi 
+
         # Map route the container group
         if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
@@ -358,7 +385,7 @@ deploy_group() {
                 fi
             fi
         else
-            log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
+            log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."

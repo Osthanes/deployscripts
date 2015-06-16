@@ -243,7 +243,7 @@ map_url_route_to_container_group (){
     # This check is not very useful ... it resturns 0 all the time and just indicates if the route is already created 
     cf check-route ${HOSTNAME} ${DOMAIN} | grep "does exist"
     local ROUTE_EXISTS=$?
-    if [ ROUTE_EXISTS -ne 0 ]; then 
+    if [ ${ROUTE_EXISTS} -ne 0 ]; then 
         local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}')
         log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
         cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
@@ -545,12 +545,11 @@ else
 fi
 
 if [ -z "$ROUTE_HOSTNAME" ]; then
-    log_and_echo "$WARN" "ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage."
+    log_and_echo "ROUTE_HOSTNAME not set.  One will be generated, or ROUTE_HOSTNAME for an existing route can be set as an environment property on the stage"
 fi
 
 if [ -z "$ROUTE_DOMAIN" ]; then
-    log_and_echo "$WARN" "ROUTE_DOMAIN not set, defaulting to mybluemix.net"
-    export ROUTE_DOMAIN="mybluemix.net"
+    log_and_echo "ROUTE_DOMAIN not set, will default to existing route domain.  ROUTE_DOMAIN can be set as an environment property on the stage"
 fi
 
 if [ -z "$CONCURRENT_VERSIONS" ];then

@@ -245,10 +245,12 @@ map_url_route_to_container_group (){
     local ROUTE_EXISTS=$?
     if [ ${ROUTE_EXISTS} -ne 0 ]; then
         # make sure we are using CF from our extension so that we can always call target.   
-        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}' | sed 's/ //g')
+        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $3}' | sed 's/ //g')
         log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
         cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
         RESULT=$?
+        log_and_echo "$WARN_LEVEL" "The created route will be reused for this stage, and will persist as an organizational route even if this container group is removed"
+        log_and_echo "$WARN_LEVEL" "If you wish to remove this route use the following command: cf delete-route ROUTE_DOMAIN -n ROUTE_HOSTNAME"
     else 
         log_and_echo "Route already created for ${HOSTNAME} ${DOMAIN}"
         local RESULT=0
@@ -295,8 +297,8 @@ map_url_route_to_container_group (){
             return 1
         fi
     else
-        log_and_echo "$ERROR" "Domain $DOMAIN not found. Please ensure that ROUTE_DOMAIN value is entered correctly on the Stage environment."
-        return 1
+        log_and_echo "$ERROR" "No route mapped to Container Group"
+        return 0
     fi
     return 0
 }
@@ -358,7 +360,7 @@ deploy_group() {
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
 
         # Map route the container group
-        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RET=$?
             if [ $RET -eq 0 ]; then
@@ -537,8 +539,8 @@ if [ -z "${ROUTE_HOSTNAME}" ]; then
     MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
     MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
     export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
-    log_and_echo "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
-fi 
+    log_and_echo "$WARN_LEVEL" "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
+ fi 
 
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 

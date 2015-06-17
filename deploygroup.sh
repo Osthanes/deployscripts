@@ -356,20 +356,6 @@ deploy_group() {
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
 
-        # generate a route if one does not exist 
-        if [ -z "${ROUTE_DOMAIN}" ]; then 
-            export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
-            log_and_echo "$WARN" "No domain specified.  To set this create environment property ROUTE_DOMAIN on the environment property for the stage.  Using $ROUTE_DOMAIN by default"
-        fi 
-
-        # if the user has not defined a Route then create one
-        if [ -z "${ROUTE_HOSTNAME}" ]; then
-            local GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
-            local MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
-            MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
-            export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
-        fi 
-
         # Map route the container group
         if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
@@ -543,13 +529,26 @@ else
     export PUBLISH_PORT=$(get_port_numbers "${PORT}")
 fi
 
-if [ -z "$ROUTE_HOSTNAME" ]; then
+# if the user has not defined a Route then create one
+if [ -z "${ROUTE_HOSTNAME}" ]; then
     log_and_echo "ROUTE_HOSTNAME not set.  One will be generated, or ROUTE_HOSTNAME for an existing route can be set as an environment property on the stage"
-fi
+    local GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
+    local MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
+    MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
+    export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+fi 
 
-if [ -z "$ROUTE_DOMAIN" ]; then
+# generate a route if one does not exist 
+if [ -z "${ROUTE_DOMAIN}" ]; then 
     log_and_echo "ROUTE_DOMAIN not set, will default to existing route domain.  ROUTE_DOMAIN can be set as an environment property on the stage"
-fi
+    export ROUTE_DOMAIN==$(cf routes | tail -1 | awk '{print $2}')
+    if [ -z "${ROUTE_DOMAIN}" ]; then 
+        export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
+        log_and_echo "No existing domains found, using organization domain (${ROUTE_DOMAIN})"  
+    else
+        log_and_echo "Found existing domain (${ROUTE_DOMAIN}) used by organization"  
+    fi 
+fi 
 
 if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1

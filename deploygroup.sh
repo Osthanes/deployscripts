@@ -541,7 +541,7 @@ fi
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 
     log_and_echo "ROUTE_DOMAIN not set, will default to existing route domain.  ROUTE_DOMAIN can be set as an environment property on the stage"
-    export ROUTE_DOMAIN==$(cf routes | tail -1 | awk '{print $2}')
+    export ROUTE_DOMAIN=$(cf routes | tail -1 | awk '{print $2}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
         export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
         log_and_echo "No existing domains found, using organization domain (${ROUTE_DOMAIN})"  

@@ -555,7 +555,24 @@ if [ -z "${ROUTE_DOMAIN}" ]; then
     log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
     export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $2}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
-        export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
+        cf domains > domains.log 
+        FOUND=''
+        while read domain; do
+            log_and_echo "${DEBUGGING}" "looking at $domain"
+            # cf spaces gives a couple lines of headers.  skip those until we find the line
+            # 'name', then read the rest of the lines as space names
+            if [ "${FOUND}x" == "x" ]; then
+                if [[ $domain == name* ]]; then
+                    FOUND="y"
+                fi
+                continue
+            else 
+                # we are now actually processing domains rather than junk 
+                export ROUTE_DOMAIN=$(echo $domain | awk '{print $1}') 
+                break
+            fi 
+        done <domains.log
+            
         log_and_echo "No existing domains found, using organization domain (${ROUTE_DOMAIN})"  
     else
         log_and_echo "Found existing domain (${ROUTE_DOMAIN}) used by organization"  

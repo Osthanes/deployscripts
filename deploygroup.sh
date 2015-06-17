@@ -243,7 +243,8 @@ map_url_route_to_container_group (){
     # This check is not very useful ... it resturns 0 all the time and just indicates if the route is already created 
     cf check-route ${HOSTNAME} ${DOMAIN} | grep "does exist"
     local ROUTE_EXISTS=$?
-    if [ ${ROUTE_EXISTS} -ne 0 ]; then 
+    if [ ${ROUTE_EXISTS} -ne 0 ]; then
+        # make sure we are using CF from our extension so that we can always call target.   
         local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}' | sed 's/ //g')
         log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
         cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
@@ -542,7 +543,7 @@ fi
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 
     log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
-    export ROUTE_DOMAIN=$(cf routes | tail -1 | awk '{print $2}')
+    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $2}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
         export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 
         log_and_echo "No existing domains found, using organization domain (${ROUTE_DOMAIN})"  

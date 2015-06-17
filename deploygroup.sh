@@ -532,8 +532,8 @@ fi
 # if the user has not defined a Route then create one
 if [ -z "${ROUTE_HOSTNAME}" ]; then
     log_and_echo "ROUTE_HOSTNAME not set.  One will be generated, or ROUTE_HOSTNAME for an existing route can be set as an environment property on the stage"
-    local GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
-    local MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
+    GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
+    MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
     MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
     export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
 fi 

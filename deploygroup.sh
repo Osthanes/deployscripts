@@ -244,10 +244,9 @@ map_url_route_to_container_group (){
     cf check-route ${HOSTNAME} ${DOMAIN} | grep "does exist"
     local ROUTE_EXISTS=$?
     if [ ${ROUTE_EXISTS} -ne 0 ]; then 
-        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}')
+        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}' | sed 's/ //g')
         log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
         cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
-        debugme cf routes
         RESULT=$?
     else 
         log_and_echo "Route already created for ${HOSTNAME} ${DOMAIN}"

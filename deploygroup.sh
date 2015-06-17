@@ -76,26 +76,21 @@ dump_info () {
         fi
     fi
 
-#    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
-#    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
-#
-#    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
-#    if [ ${AVAILABLE} -le 0 ]; then
-#        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
-#    else
-#        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
-#    fi
-
-    log_and_echo "Groups: "
+    log_and_echo "$LABEL" "Groups: "
     log_and_echo `ice group list 2> /dev/null`
-    log_and_echo "Routes: "
+    log_and_echo "$LABEL" "Routes: "
     log_and_echo `cf routes`
-    log_and_echo "Running Containers: "
+    log_and_echo "$LABEL" "Running Containers: "
     log_and_echo `ice ps 2> /dev/null`
-    log_and_echo "Floating IP addresses"
+    log_and_echo "$LABEL" "Floating IP addresses"
     log_and_echo `ice ip list 2> /dev/null`
-    log_and_echo "Images:"
-    log_and_echo `ice images`
+    log_and_echo "$LABEL" "Images:"
+    ice images > inspect.log 2>&1 
+    IMAGE_ARRAY=$(cat inspect.log)
+    for image in ${IMAGE_ARRAY[@]}
+    do
+        log_and_echo "${image}"
+    done 
 
     return 0
 }
@@ -275,10 +270,10 @@ map_url_route_to_container_group (){
                 let COUNTER=COUNTER+1
                 RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
                 if [ "$RESPONSE" -eq 200 ]; then
-                    log_and_echo "${green}Map requested route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed.${no_color}"
+                    log_and_echo "${green}Request to map route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed successfully.${no_color}"
                     break
                 else
-                    log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') does not exist (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
+                    log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
                     sleep 10
                 fi
             done

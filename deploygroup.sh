@@ -298,7 +298,7 @@ map_url_route_to_container_group (){
         fi
     else
         log_and_echo "$ERROR" "No route mapped to Container Group"
-        return 0
+        return 1
     fi
     return 0
 }
@@ -364,7 +364,7 @@ deploy_group() {
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RET=$?
             if [ $RET -eq 0 ]; then
-                log_and_echo "${green}Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
+                log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
             else
                 if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."

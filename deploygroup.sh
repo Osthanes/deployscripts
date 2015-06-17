@@ -53,6 +53,10 @@ print_create_fail_msg () {
     log_and_echo ""
 }
 
+debugme() {
+  [[ $DEBUG = 1 ]] && "$@" || :
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
@@ -77,15 +81,29 @@ dump_info () {
     fi
 
     log_and_echo "$LABEL" "Groups: "
-    log_and_echo `ice group list 2> /dev/null`
+    ice group list > mylog.log 2>&1 
+    debugme cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
     log_and_echo "$LABEL" "Routes: "
-    log_and_echo `cf routes`
+    cf routes > mylog.log 2>&1 
+    debugme cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
     log_and_echo "$LABEL" "Running Containers: "
-    log_and_echo `ice ps 2> /dev/null`
-    log_and_echo "$LABEL" "Floating IP addresses"
-    log_and_echo `ice ip list 2> /dev/null`
+    ice ps > mylog.log 2>&1 
+    debugme cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "IP addresses"
+    ice ip list > mylog.log 2>&1 
+    debugme cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
     log_and_echo "$LABEL" "Images:"
-    log_and_echo `ice images 2> /dev/null`
+    ice images > mylog.log 2>&1 
+    debugme cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
 
     return 0
 }

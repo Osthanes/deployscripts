@@ -253,12 +253,12 @@ map_url_route_to_container_group (){
     local ROUTE_EXISTS=$?
     if [ ${ROUTE_EXISTS} -ne 0 ]; then
         # make sure we are using CF from our extension so that we can always call target.   
-        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $3}' | sed 's/ //g')
+        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}' | sed 's/ //g')
         log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
         cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
         RESULT=$?
-        log_and_echo "$WARN_LEVEL" "The created route will be reused for this stage, and will persist as an organizational route even if this container group is removed"
-        log_and_echo "$WARN_LEVEL" "If you wish to remove this route use the following command: cf delete-route ROUTE_DOMAIN -n ROUTE_HOSTNAME"
+        log_and_echo "$WARN" "The created route will be reused for this stage, and will persist as an organizational route even if this container group is removed"
+        log_and_echo "$WARN" "If you wish to remove this route use the following command: cf delete-route ROUTE_DOMAIN -n ROUTE_HOSTNAME"
     else 
         log_and_echo "Route already created for ${HOSTNAME} ${DOMAIN}"
         local RESULT=0
@@ -547,7 +547,7 @@ if [ -z "${ROUTE_HOSTNAME}" ]; then
     MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
     MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
     export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
-    log_and_echo "$WARN_LEVEL" "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
+    log_and_echo "$WARN" "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
  fi 
 
 # generate a route if one does not exist 

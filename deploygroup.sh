@@ -85,12 +85,7 @@ dump_info () {
     log_and_echo "$LABEL" "Floating IP addresses"
     log_and_echo `ice ip list 2> /dev/null`
     log_and_echo "$LABEL" "Images:"
-    ice images > inspect.log 2>&1 
-    IMAGE_ARRAY=$(cat inspect.log)
-    for image in ${IMAGE_ARRAY[@]}
-    do
-        log_and_echo "${image}"
-    done 
+    log_and_echo `ice images 2> /dev/null`
 
     return 0
 }
@@ -273,7 +268,7 @@ map_url_route_to_container_group (){
                     log_and_echo "${green}Request to map route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed successfully.${no_color}"
                     break
                 else
-                    log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
+                    log_and_echo "${WARN}" "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
                     sleep 10
                 fi
             done

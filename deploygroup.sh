@@ -531,16 +531,17 @@ fi
 
 # if the user has not defined a Route then create one
 if [ -z "${ROUTE_HOSTNAME}" ]; then
-    log_and_echo "ROUTE_HOSTNAME not set.  One will be generated, or ROUTE_HOSTNAME for an existing route can be set as an environment property on the stage"
+    log_and_echo "ROUTE_HOSTNAME not set.  One will be generated.  ${label_color}ROUTE_HOSTNAME can be set as an environment property on the stage${no_color}"
     GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
     MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
     MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
     export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+    log_and_echo "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
 fi 
 
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 
-    log_and_echo "ROUTE_DOMAIN not set, will default to existing route domain.  ROUTE_DOMAIN can be set as an environment property on the stage"
+    log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
     export ROUTE_DOMAIN=$(cf routes | tail -1 | awk '{print $2}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
         export ROUTE_DOMAIN=$(cf domains | grep -E '[a-z0-9]\.' | tail -1 | awk '{print $1}') 

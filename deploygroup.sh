@@ -82,27 +82,27 @@ dump_info () {
 
     log_and_echo "$LABEL" "Groups: "
     ice group list > mylog.log 2>&1 
-    debugme cat mylog.log
+    cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "Routes: "
     cf routes > mylog.log 2>&1 
-    debugme cat mylog.log
+    cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "Running Containers: "
     ice ps > mylog.log 2>&1 
-    debugme cat mylog.log
+    cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "IP addresses"
     ice ip list > mylog.log 2>&1 
-    debugme cat mylog.log
+    cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "Images:"
     ice images > mylog.log 2>&1 
-    debugme cat mylog.log
+    cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     return 0

@@ -511,6 +511,8 @@ if [ -z "$CONCURRENT_VERSIONS" ];then
 fi
 
 log_and_echo "$LABEL" "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
+${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} container deployment for ${CONTAINER_NAME} requested"
+
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then

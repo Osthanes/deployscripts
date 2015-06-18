@@ -515,7 +515,7 @@ clean() {
 #   simple: simply deploy a container and set the inventory
 #   red_black: deploy new container, assign floating IP address, keep original container
 log_and_echo "$LABEL" "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
-${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} deployment for ${CONTAINER_NAME} requested"
+${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} copntainer group deployment for ${CONTAINER_NAME} requested"
 
 
 check_num='^[0-9]+$'
@@ -632,5 +632,5 @@ else
 fi
 
 dump_info
-${EXT_DIR}/utilities/sendMessage.sh -l good -m "Successful ${DEPLOY_TYPE} deployment of ${CONTAINER_NAME}"
+${EXT_DIR}/utilities/sendMessage.sh -l good -m "Successful ${DEPLOY_TYPE} container group deployment of ${CONTAINER_NAME}"
 exit 0

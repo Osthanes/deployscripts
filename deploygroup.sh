@@ -53,6 +53,10 @@ print_create_fail_msg () {
     log_and_echo ""
 }
 
+debugme() {
+  [[ $DEBUG = 1 ]] && "$@" || :
+}
+
 dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
@@ -76,26 +80,30 @@ dump_info () {
         fi
     fi
 
-#    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
-#    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
-#
-#    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
-#    if [ ${AVAILABLE} -le 0 ]; then
-#        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
-#    else
-#        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
-#    fi
+    log_and_echo "$LABEL" "Groups: "
+    ice group list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
 
-    log_and_echo "Groups: "
-    log_and_echo `ice group list 2> /dev/null`
-    log_and_echo "Routes: "
-    log_and_echo `cf routes`
-    log_and_echo "Running Containers: "
-    log_and_echo `ice ps 2> /dev/null`
-    log_and_echo "Floating IP addresses"
-    log_and_echo `ice ip list 2> /dev/null`
-    log_and_echo "Images:"
-    log_and_echo `ice images`
+    log_and_echo "$LABEL" "Routes: "
+    cf routes > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Running Containers: "
+    ice ps > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "IP addresses"
+    ice ip list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Images:"
+    ice images > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
 
     return 0
 }
@@ -240,8 +248,22 @@ map_url_route_to_container_group (){
         return 1
     fi
     # Check domain name is valid
-    cf check-route ${HOSTNAME} ${DOMAIN} 2>&1> /dev/null
-    local RESULT=$?
+    # This check is not very useful ... it resturns 0 all the time and just indicates if the route is already created 
+    cf check-route ${HOSTNAME} ${DOMAIN} | grep "does exist"
+    local ROUTE_EXISTS=$?
+    if [ ${ROUTE_EXISTS} -ne 0 ]; then
+        # make sure we are using CF from our extension so that we can always call target.   
+        local MYSPACE=$(${EXT_DIR}/cf target | grep Space | awk '{print $2}' | sed 's/ //g')
+        log_and_echo "Route does not exist, attempting to create for ${HOSTNAME} ${DOMAIN} in ${MYSPACE}"
+        cf create-route ${MYSPACE} ${DOMAIN} -n ${HOSTNAME}
+        RESULT=$?
+        log_and_echo "$WARN" "The created route will be reused for this stage, and will persist as an organizational route even if this container group is removed"
+        log_and_echo "$WARN" "If you wish to remove this route use the following command: cf delete-route ROUTE_DOMAIN -n ROUTE_HOSTNAME"
+    else 
+        log_and_echo "Route already created for ${HOSTNAME} ${DOMAIN}"
+        local RESULT=0
+    fi 
+
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
         log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
@@ -261,10 +283,10 @@ map_url_route_to_container_group (){
                 let COUNTER=COUNTER+1
                 RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
                 if [ "$RESPONSE" -eq 200 ]; then
-                    log_and_echo "${green}Map requested route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed.${no_color}"
+                    log_and_echo "${green}Request to map route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed successfully.${no_color}"
                     break
                 else
-                    log_and_echo "Requested route ('${HOSTNAME}.${DOMAIN}') does not exist (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
+                    log_and_echo "${WARN}" "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
                     sleep 10
                 fi
             done
@@ -283,7 +305,7 @@ map_url_route_to_container_group (){
             return 1
         fi
     else
-        log_and_echo "$ERROR" "Domain $DOMAIN not found. Please ensure that ROUTE_DOMAIN value is entered correctly on the Stage environment."
+        log_and_echo "$ERROR" "No route mapped to Container Group"
         return 1
     fi
     return 0
@@ -303,6 +325,7 @@ deploy_group() {
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
         log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists. Please delete it or run group deployment again."
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Deployment of ${MY_GROUP_NAME} failed as the group already exists"
         exit 1
     fi
 
@@ -344,12 +367,13 @@ deploy_group() {
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
+
         # Map route the container group
-        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
+        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
             map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
             RET=$?
             if [ $RET -eq 0 ]; then
-                log_and_echo "${green}Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'.${no_color}"
+                log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
             else
                 if [ "${DEBUG}x" != "1x" ]; then
                     log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
@@ -358,7 +382,7 @@ deploy_group() {
                 fi
             fi
         else
-            log_and_echo "$WARN" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
+            log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
@@ -382,6 +406,7 @@ deploy_simple () {
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment"
         exit $RESULT
     fi
 }
@@ -393,6 +418,7 @@ deploy_red_black () {
     deploy_group ${MY_GROUP_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Deployment of ${MY_GROUP_NAME} failed"
         exit $RESULT
     fi
 
@@ -400,6 +426,7 @@ deploy_red_black () {
         clean
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
+            ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed to cleanup previous groups after deployment of group ${MY_GROUP_NAME}"
             exit $RESULT
         fi
     else
@@ -488,6 +515,8 @@ clean() {
 #   simple: simply deploy a container and set the inventory
 #   red_black: deploy new container, assign floating IP address, keep original container
 log_and_echo "$LABEL" "Deploying using ${DEPLOY_TYPE} strategy, for ${CONTAINER_NAME}, deploy number ${BUILD_NUMBER}"
+${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} copntainer group deployment for ${CONTAINER_NAME} requested"
+
 
 check_num='^[0-9]+$'
 if [ -z "$DESIRED_INSTANCES" ]; then
@@ -517,14 +546,44 @@ else
     export PUBLISH_PORT=$(get_port_numbers "${PORT}")
 fi
 
-if [ -z "$ROUTE_HOSTNAME" ]; then
-    log_and_echo "$WARN" "ROUTE_HOSTNAME not set.  Please set the desired or existing route hostname as an environment property on the stage."
-fi
+# if the user has not defined a Route then create one
+if [ -z "${ROUTE_HOSTNAME}" ]; then
+    log_and_echo "ROUTE_HOSTNAME not set.  One will be generated.  ${label_color}ROUTE_HOSTNAME can be set as an environment property on the stage${no_color}"
+    GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
+    MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
+    MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
+    export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+    log_and_echo "$WARN" "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
+ fi 
 
-if [ -z "$ROUTE_DOMAIN" ]; then
-    log_and_echo "$WARN" "ROUTE_DOMAIN not set, defaulting to mybluemix.net"
-    export ROUTE_DOMAIN="mybluemix.net"
-fi
+# generate a route if one does not exist 
+if [ -z "${ROUTE_DOMAIN}" ]; then 
+    log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
+    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $2}')
+    if [ -z "${ROUTE_DOMAIN}" ]; then 
+        cf domains > domains.log 
+        FOUND=''
+        while read domain; do
+            log_and_echo "${DEBUGGING}" "looking at $domain"
+            # cf spaces gives a couple lines of headers.  skip those until we find the line
+            # 'name', then read the rest of the lines as space names
+            if [ "${FOUND}x" == "x" ]; then
+                if [[ $domain == name* ]]; then
+                    FOUND="y"
+                fi
+                continue
+            else 
+                # we are now actually processing domains rather than junk 
+                export ROUTE_DOMAIN=$(echo $domain | awk '{print $1}') 
+                break
+            fi 
+        done <domains.log
+            
+        log_and_echo "No existing domains found, using organization domain (${ROUTE_DOMAIN})"  
+    else
+        log_and_echo "Found existing domain (${ROUTE_DOMAIN}) used by organization"  
+    fi 
+fi 
 
 if [ -z "$CONCURRENT_VERSIONS" ];then
     export CONCURRENT_VERSIONS=1
@@ -573,4 +632,5 @@ else
 fi
 
 dump_info
+${EXT_DIR}/utilities/sendMessage.sh -l good -m "Successful ${DEPLOY_TYPE} container group deployment of ${CONTAINER_NAME}"
 exit 0

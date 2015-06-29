@@ -549,12 +549,17 @@ fi
 # if the user has not defined a Route then create one
 if [ -z "${ROUTE_HOSTNAME}" ]; then
     log_and_echo "ROUTE_HOSTNAME not set.  One will be generated.  ${label_color}ROUTE_HOSTNAME can be set as an environment property on the stage${no_color}"
-    log_and_echo "$DEBUGGING" "IDS PROJECT NAME ${IDS_PROJECT_NAME}."  
-    GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
-    log_and_echo "$DEBUGGING" "IDS GEN_NAME NAME ${GEN_NAME}."  
-    MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
-    MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
-    export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+    if [ -z "$IDS_PROJECT_NAME" ]; then 
+        log_and_echo "$ERROR" "${red}Failed to generate route based on project name${no_color}"
+        export ROUTE_HOSTNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+    else 
+        log_and_echo "$DEBUGGING" "IDS PROJECT NAME ${IDS_PROJECT_NAME}."  
+        GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')
+        log_and_echo "$DEBUGGING" "IDS GEN_NAME NAME ${GEN_NAME}."  
+        MY_STAGE_NAME=$(echo $IDS_STAGE_NAME | sed 's/ //g')
+        MY_STAGE_NAME=$(echo $MY_STAGE_NAME | sed 's/\./-/g')
+        export ROUTE_HOSTNAME=${GEN_NAME}-${MY_STAGE_NAME}
+    fi 
     log_and_echo "$WARN" "Generated ROUTE_HOSTNAME is ${ROUTE_HOSTNAME}."  
  fi 
 

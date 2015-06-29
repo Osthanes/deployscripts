@@ -551,7 +551,7 @@ if [ -z "${ROUTE_HOSTNAME}" ]; then
     log_and_echo "ROUTE_HOSTNAME not set.  One will be generated.  ${label_color}ROUTE_HOSTNAME can be set as an environment property on the stage${no_color}"
     if [ -z "$IDS_PROJECT_NAME" ]; then 
         log_and_echo "$ERROR" "${red}Failed to generate route based on project name${no_color}"
-        export ROUTE_HOSTNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+        export ROUTE_HOSTNAME=${TASK_ID}
     else 
         log_and_echo "$DEBUGGING" "IDS PROJECT NAME ${IDS_PROJECT_NAME}."  
         GEN_NAME=$(echo $IDS_PROJECT_NAME | sed 's/ | /-/g')

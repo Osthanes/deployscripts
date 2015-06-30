@@ -583,6 +583,9 @@ if [ -z "${ROUTE_DOMAIN}" ]; then
     else
         log_and_echo "Found existing domain (${ROUTE_DOMAIN}) used by organization"  
     fi 
+    if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+        echo "export ROUTE_DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
+    fi
 fi 
 
 if [ -z "$CONCURRENT_VERSIONS" ];then

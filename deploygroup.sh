@@ -374,6 +374,13 @@ deploy_group() {
                     log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
                 fi
             fi
+            if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+                TEST_URL_ROUTE="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
+                echo "export TEST_URL_ROUTE="${TEST_URL_ROUTE}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export ROUTE_HOSTNAME="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export ROUTE_DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+            fi
         else
             log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi

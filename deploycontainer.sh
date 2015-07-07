@@ -371,9 +371,14 @@ deploy_red_black () {
             exit 1
         fi
     fi
+    TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
     log_and_echo "Exporting TEST_URL:${TEST_URL}"
-    export TEST_URL="${URL_PROTOCOL}${FLOATING_IP}:$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"
-
+    if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+        echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
+        echo "export FLOATING_IP="${FLOATING_IP}"" >> "${DEPLOY_PROPERTY_FILE}"
+        echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+    fi
+ 
     log_and_echo "${green}Public IP address of ${CONTAINER_NAME}_${BUILD_NUMBER} is ${FLOATING_IP} and the TEST_URL is ${TEST_URL} ${no_color}"
 }
 

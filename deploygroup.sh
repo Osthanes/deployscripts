@@ -377,8 +377,7 @@ deploy_group() {
             if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
                 TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
                 echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export HOSTNAME="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
                 echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
             fi
         else

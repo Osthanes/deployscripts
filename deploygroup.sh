@@ -375,10 +375,10 @@ deploy_group() {
                 fi
             fi
             if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
-                TEST_URL_ROUTE="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
-                echo "export TEST_URL_ROUTE="${TEST_URL_ROUTE}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export ROUTE_HOSTNAME="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export ROUTE_DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
+                TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
+                echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export HOSTNAME="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
                 echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
             fi
         else
@@ -609,6 +609,10 @@ else
     log_and_echo "$WARN" "AUTO_RECOVERY value is invalid. Please enter false or true value."
     log_and_echo "$LABEL" "Setting AUTO_RECOVERY value to false and continue deploy process."
     export AUTO=""
+fi
+
+if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+    echo "export GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"" >> "${DEPLOY_PROPERTY_FILE}"
 fi
 
 # set the memory size

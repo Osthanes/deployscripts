@@ -375,7 +375,7 @@ deploy_red_black () {
     log_and_echo "Exporting TEST_URL:${TEST_URL}"
     if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
         echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
-        echo "export FLOATING_IP="${FLOATING_IP}"" >> "${DEPLOY_PROPERTY_FILE}"
+        echo "export IP="${FLOATING_IP}"" >> "${DEPLOY_PROPERTY_FILE}"
         echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
     fi
  
@@ -496,6 +496,10 @@ if [ -z "$PORT" ]; then
     export PUBLISH_PORT="--publish 80"
 else
     export PUBLISH_PORT=$(get_port_numbers "${PORT}")
+fi
+
+if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+    echo "export SINGLE_CONTAINER_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"" >> "${DEPLOY_PROPERTY_FILE}"
 fi
 
 # set the memory size

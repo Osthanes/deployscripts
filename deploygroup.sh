@@ -377,9 +377,8 @@ deploy_group() {
             if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
                 TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
                 echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export HOSTNAME="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export DOMAIN="${ROUTE_DOMAIN}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
+                echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
             fi
         else
             log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."

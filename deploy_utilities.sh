@@ -75,7 +75,8 @@ fi
 #   data: group container data in json
 ###################################################################
 get_group_container_data_json() {
-    local data=$(ice --verbose group list  | sed -n '/{/,/}/p')
+    ice_retry_save_output --verbose group list
+    local data=$(sed -n '/{/,/}/p' iceretry.log)
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
         return 1
@@ -224,9 +225,9 @@ get_memory() {
 ###################################################################
 # check_memory_quota
 ###################################################################
-# this function expects a file "iceinfo.log" to exist in the current director, being the output of a call to 'ice info'
+# this function expects a file "iceretry.log" to exist in the current director, being the output of a call to 'ice info'
 # example:
-#    ice info > iceinfo.log 2> /dev/null
+#    ice info
 #    RESULT=$?
 #    if [ $RESULT -eq 0 ]; then
 #        check_memory_quota()
@@ -238,8 +239,8 @@ get_memory() {
 check_memory_quota() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory "$CONT_SIZE" 2> /dev/null)
-    local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceinfo.log | awk '{print $5}')
-    local MEMORY_USAGE=$(grep "Memory usage (MB)" iceinfo.log | awk '{print $5}')
+    local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
+    local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
         echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
@@ -256,7 +257,7 @@ check_memory_quota() {
 get_memory_size() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory $CONT_SIZE)
-    ice info > iceinfo.log 2> /dev/null
+    ice_retry_save_output ice info
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         $(check_memory_quota $NEW_MEMORY)
@@ -345,8 +346,8 @@ unittest() {
 
     # Unit Test for check_memory_quota() function
     #############################################
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 0" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 0" >>iceretry.log
     $(check_memory_quota 256 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
@@ -354,8 +355,8 @@ unittest() {
         return 30
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 1024" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 1024" >>iceretry.log
     $(check_memory_quota 2048 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then
@@ -363,16 +364,16 @@ unittest() {
         return 31
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 2048" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 2048" >>iceretry.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "ut fail (incorrect pass for too much memory 2048+512)"
         return 32
     fi
-    echo "Memory limit (MB)      : 1024" >iceinfo.log
-    echo "Memory usage (MB)      : 0" >>iceinfo.log
+    echo "Memory limit (MB)      : 1024" >iceretry.log
+    echo "Memory usage (MB)      : 0" >>iceretry.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
@@ -380,8 +381,8 @@ unittest() {
         return 33
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 1024" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 1024" >>iceretry.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
@@ -389,8 +390,8 @@ unittest() {
         return 34
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 2048" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 2048" >>iceretry.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then

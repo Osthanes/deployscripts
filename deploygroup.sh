@@ -61,7 +61,8 @@ dump_info () {
     log_and_echo "$LABEL" "Container Information: "
     log_and_echo "$LABEL" "Information about this organization and space:"
     log_and_echo "Summary:"
-    local ICEINFO=$(ice info 2>/dev/null)
+    ice_retry_save_output info 2>/dev/null
+    local ICEINFO=$(cat iceretry.log)
     log_and_echo "$ICEINFO"
 
     # check memory limit, warn user if we're at or approaching the limit
@@ -120,7 +121,8 @@ update_inventory(){
     # find the container or group id
     local RESULT=0
     if [ "$TYPE" == "ibm_containers" ]; then
-        ID=$(ice inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        ice_retry_save_output inspect ${NAME} 2> /dev/null
+        ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
         RESULT=$?
         if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
             log_and_echo "$ERROR" "Could not find container called $NAME"
@@ -129,7 +131,8 @@ update_inventory(){
         fi
 
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        ID=$(ice group inspect ${NAME} | grep "\"Id\":" | awk '{print $2}')
+        ice_retry_save_output group inspect ${NAME} 2> /dev/null
+        ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
         RESULT=$?
         if [ $RESULT -ne 0 ] || [ -z "${ID}" ]; then
             # get continer Id: attribute="Name", value="${NAME}", search_attribute="Id"
@@ -211,7 +214,8 @@ wait_for_group (){
     local STATUS="unknown"
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        STATUS=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        ice_retry_save_output inspect ${WAITING_FOR} 2> /dev/null
+        STATUS=$(grep "Status" iceretry.log | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATUS}" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
@@ -267,7 +271,7 @@ map_url_route_to_container_group (){
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
         log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
-        ice route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
+        ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
             # loop until the route to container group success with retun code 200 or time-out.
@@ -348,7 +352,7 @@ deploy_group() {
 
     # create the group and check the results
     log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-    ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    ice_retry group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}"
@@ -386,7 +390,7 @@ deploy_group() {
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
         sleep 3
-        ice group rm ${MY_GROUP_NAME}
+        ice_retry group rm ${MY_GROUP_NAME}
         if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
             log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
@@ -468,7 +472,7 @@ clean() {
         elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
             # unmap router and remove the group
             log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${groupName}"
-            ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
+            ice_retry route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 log_and_echo "$WARN" "'ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
@@ -477,7 +481,7 @@ clean() {
             fi
             sleep 2
             log_and_echo "removing group ${groupName}"
-            ice group rm ${groupName}
+            ice_retry group rm ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"
@@ -488,7 +492,7 @@ clean() {
             FIND_PREVIOUS="true"
         else
             log_and_echo "removing group ${groupName}"
-            ice group rm ${groupName}
+            ice_retry group rm ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"

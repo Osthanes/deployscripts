@@ -214,7 +214,7 @@ wait_for_group (){
     local STATUS="unknown"
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        ice_retry_save_output inspect ${WAITING_FOR} 2> /dev/null
+        ice_retry_save_output group inspect ${WAITING_FOR} 2> /dev/null
         STATUS=$(grep "Status" iceretry.log | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATUS}" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"

@@ -204,19 +204,30 @@ get_port_numbers() {
 # normalize memory size - adjust to the allowed set of memory sizes
 ###################################################################
 get_memory() {
-    local CONT_SIZE=$1
+    # make CONT_SIZE all lowercase
+    local CONT_SIZE=${1,,}
     local NEW_MEMORY=256
     # check for container size and set the value as MB
-    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
+    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "micro" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
         NEW_MEMORY=256
-    elif [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
+    elif [ "$CONT_SIZE" == "tiny" ] || [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
         NEW_MEMORY=512
-    elif [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
+    elif [ "$CONT_SIZE" == "small" ] || [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
         NEW_MEMORY=1024
-    elif [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
+    elif [ "$CONT_SIZE" == "medium" ] || [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
         NEW_MEMORY=2048
+    elif [ "$CONT_SIZE" == "large" ] || [ "$CONT_SIZE" == "4096" ]; then
+        NEW_MEMORY=4096
+    elif [ "$CONT_SIZE" == "x-large" ] || [ "$CONT_SIZE" == "8192" ]; then
+        NEW_MEMORY=8192
+    elif [ "$CONT_SIZE" == "2x-large" ] || [ "$CONT_SIZE" == "16384" ]; then
+        NEW_MEMORY=16384
+    elif [ "$CONT_SIZE" == "pico" ] || [ "$CONT_SIZE" == "64" ]; then
+        NEW_MEMORY=64
+    elif [ "$CONT_SIZE" == "nano" ] || [ "$CONT_SIZE" == "128" ]; then
+        NEW_MEMORY=128
     else
-        echo -e "${red}$CONT_SIZE is an invalid value, defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
+        echo -e "${red}$1 is an invalid value, defaulting to micro (256 MB memory) and continuing deploy process.${no_color}" >&2
         NEW_MEMORY=256
     fi
     echo "$NEW_MEMORY"
@@ -283,65 +294,135 @@ unittest() {
 
     # Unit Test for get_memory() function
     #############################################
+    RET=$(get_memory 64 2> /dev/null)
+    if [ "${RET}x" != "64x" ]; then
+        echo "ut fail (bad memory value on check 64)"
+        return 10
+    fi
+    RET=$(get_memory "pico" 2> /dev/null)
+    if [ "${RET}x" != "64x" ]; then
+        echo "ut fail (bad memory value on check pico)"
+        return 11
+    fi
+    RET=$(get_memory 128 2> /dev/null)
+    if [ "${RET}x" != "128x" ]; then
+        echo "ut fail (bad memory value on check 128)"
+        return 12
+    fi
+    RET=$(get_memory "nano" 2> /dev/null)
+    if [ "${RET}x" != "128x" ]; then
+        echo "ut fail (bad memory value on check nano)"
+        return 13
+    fi
     RET=$(get_memory 256 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check 256)"
-        return 10
+        return 14
     fi
     RET=$(get_memory "m1.tiny" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check m1.tiny)"
-        return 11
+        return 15
+    fi
+    RET=$(get_memory "micro" 2> /dev/null)
+    if [ "${RET}x" != "256x" ]; then
+        echo "ut fail (bad memory value on check micro)"
+        return 16
     fi
     RET=$(get_memory 512 2> /dev/null)
     if [ "${RET}x" != "512x" ]; then
         echo "ut fail (bad memory value on check 512)"
-        return 12
+        return 17
     fi
     RET=$(get_memory "m1.small" 2> /dev/null)
     if [ "${RET}x" != "512x" ]; then
         echo "ut fail (bad memory value on check m1.small)"
-        return 13
+        return 18
+    fi
+    RET=$(get_memory "tiny" 2> /dev/null)
+    if [ "${RET}x" != "512x" ]; then
+        echo "ut fail (bad memory value on check tiny)"
+        return 19
     fi
     RET=$(get_memory 1024 2> /dev/null)
     if [ "${RET}x" != "1024x" ]; then
         echo "ut fail (bad memory value on check 1024)"
-        return 14
+        return 20
+    fi
+    RET=$(get_memory "small" 2> /dev/null)
+    if [ "${RET}x" != "1024x" ]; then
+        echo "ut fail (bad memory value on check small)"
+        return 21
     fi
     RET=$(get_memory "m1.medium" 2> /dev/null)
     if [ "${RET}x" != "1024x" ]; then
         echo "ut fail (bad memory value on check m1.medium)"
-        return 15
+        return 22
     fi
     RET=$(get_memory 2048 2> /dev/null)
     if [ "${RET}x" != "2048x" ]; then
         echo "ut fail (bad memory value on check 2048)"
-        return 16
+        return 23
+    fi
+    RET=$(get_memory "medium" 2> /dev/null)
+    if [ "${RET}x" != "2048x" ]; then
+        echo "ut fail (bad memory value on check medium)"
+        return 24
     fi
     RET=$(get_memory "m1.large" 2> /dev/null)
     if [ "${RET}x" != "2048x" ]; then
         echo "ut fail (bad memory value on check m1.large)"
-        return 17
+        return 25
     fi
     RET=$(get_memory 4096 2> /dev/null)
-    if [ "${RET}x" != "256x" ]; then
+    if [ "${RET}x" != "4096x" ]; then
         echo "ut fail (bad memory value on check 4096)"
-        return 18
+        return 26
+    fi
+    RET=$(get_memory "large" 2> /dev/null)
+    if [ "${RET}x" != "4096x" ]; then
+        echo "ut fail (bad memory value on check large)"
+        return 27
+    fi
+    RET=$(get_memory 8192 2> /dev/null)
+    if [ "${RET}x" != "8192x" ]; then
+        echo "ut fail (bad memory value on check 8192)"
+        return 28
+    fi
+    RET=$(get_memory "x-large" 2> /dev/null)
+    if [ "${RET}x" != "8192x" ]; then
+        echo "ut fail (bad memory value on check x-large)"
+        return 29
+    fi
+    RET=$(get_memory 16384 2> /dev/null)
+    if [ "${RET}x" != "16384x" ]; then
+        echo "ut fail (bad memory value on check 16384)"
+        return 30
+    fi
+    RET=$(get_memory "2x-large" 2> /dev/null)
+    if [ "${RET}x" != "16384x" ]; then
+        echo "ut fail (bad memory value on check 2x-large)"
+        return 31
+    fi
+    RET=$(get_memory 32 2> /dev/null)
+    if [ "${RET}x" != "256x" ]; then
+        echo "ut fail (bad memory value on check 32)"
+        return 32
     fi
     RET=$(get_memory "bad_value" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check bad_value)"
-        return 19
+        return 33
     fi
     RET=$(get_memory 1 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check 1)"
-        return 20
+        return 34
     fi
     RET=$(get_memory "" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on empty check)"
-        return 21
+        return 35
     fi
 
     # Unit Test for check_memory_quota() function
@@ -352,7 +433,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with 256 size)"
-        return 30
+        return 40
     fi
 
     echo "Memory limit (MB)      : 2048" >iceretry.log
@@ -361,7 +442,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "ut fail (incorrect pass for too much memory 2048+2048)"
-        return 31
+        return 41
     fi
 
     echo "Memory limit (MB)      : 2048" >iceretry.log
@@ -370,7 +451,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "ut fail (incorrect pass for too much memory 2048+512)"
-        return 32
+        return 42
     fi
     echo "Memory limit (MB)      : 1024" >iceretry.log
     echo "Memory usage (MB)      : 0" >>iceretry.log
@@ -378,7 +459,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with 512 size)"
-        return 33
+        return 43
     fi
 
     echo "Memory limit (MB)      : 2048" >iceretry.log
@@ -387,7 +468,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with -1 size)"
-        return 34
+        return 44
     fi
 
     echo "Memory limit (MB)      : 2048" >iceretry.log
@@ -396,7 +477,7 @@ unittest() {
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "incorrect pass for too much memory 2048+\"-1\")"
-        return 34
+        return 45
     fi
 
     # Unit Test for get_port_numbers() function
@@ -404,52 +485,52 @@ unittest() {
     RET=$(get_port_numbers "80" 2> /dev/null)
     if [ "${RET}x" != "--publish 80x" ]; then
         echo "ut fail (bad publish value on port check \"80\")"
-        return 40
+        return 50
     fi
     RET=$(get_port_numbers "80,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad publish value on port check \"80,8080\")"
-        return 41
+        return 51
     fi
     RET=$(get_port_numbers "80,8080 " 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on trailing space \"80, 8080 \")"
-        return 42
+        return 52
     fi
     RET=$(get_port_numbers "80,8080 ," 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on trailing space and comma \"80, 8080 ,\")"
-        return 43
+        return 53
     fi
     RET=$(get_port_numbers "80, 8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on intervening space \"80, 8080\")"
-        return 44
+        return 54
     fi
     RET=$(get_port_numbers "badvalue" 2> /dev/null)
     if [ "${RET}x" != "--publish 80x" ]; then
         echo "ut fail (bad error check on invalid value)"
-        return 45
+        return 55
     fi
     RET=$(get_port_numbers "80,,,,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on internal commas)"
-        return 46
+        return 56
     fi
     RET=$(get_port_numbers ",,,,80,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on leading commas)"
-        return 47
+        return 57
     fi
     RET=$(get_port_numbers "80,8080,,,," 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on trailing commas)"
-        return 48
+        return 58
     fi
     RET=$(get_port_numbers "80    8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad check on no commas)"
-        return 49
+        return 59
     fi
 
     return 0

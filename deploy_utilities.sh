@@ -285,6 +285,197 @@ get_memory_size() {
 }
 
 ###################################################################
+# print fail message
+###################################################################
+print_fail_msg () {
+    local TYPE=$1
+    log_and_echo ""
+    log_and_echo "When a ${TYPE} cannot be created, the following are a common set of debugging steps."
+    log_and_echo ""
+    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    log_and_echo ""
+    log_and_echo "2. Log into IBM Container Service."                                  
+    log_and_echo "      ${green}ice login ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}cf login ${no_color}"
+    log_and_echo ""
+    if [ "$TYPE" == "ibm_containers" ]; then
+        log_and_echo "3. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        log_and_echo "3. Run 'ice group create --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+    fi
+    log_and_echo ""
+    log_and_echo "4. Test the container locally."
+    log_and_echo "  a. Pull the image to your computer."
+    log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
+    log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
+    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry.  For example: "
+    log_and_echo "      [fix and update your local Dockerfile]"
+    log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
+    log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
+    if [ "$TYPE" == "ibm_containers" ]; then
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
+        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice group create' command to determine if the container group will now run on Bluemix."
+        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
+    fi
+    log_and_echo ""
+    log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
+    log_and_echo ""
+    log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
+    log_and_echo ""
+}
+
+###################################################################
+# dump info
+###################################################################
+dump_info () {
+    log_and_echo "$LABEL" "Container Information: "
+    log_and_echo "$LABEL" "Information about this organization and space:"
+    log_and_echo "Summary:"
+    ice_retry_save_output info 2>/dev/null
+    local ICEINFO=$(cat iceretry.log)
+    log_and_echo "$ICEINFO"
+
+    # check memory limit, warn user if we're at or approaching the limit
+    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    # if memory limit is disabled no need to check and warn
+    if [ ! -z ${MEMORY_LIMIT} ]; then
+        if [ ${MEMORY_LIMIT} -ge 0 ]; then
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
+            local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
+
+            if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
+                log_and_echo "$ERROR" "You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used "
+            elif [ ${MEMORY_USAGE} -ge ${MEM_WARNING_LEVEL} ]; then
+                log_and_echo "$WARN" "You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}"
+            fi
+        fi
+    fi
+
+    log_and_echo "$LABEL" "Groups: "
+    ice group list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Routes: "
+    cf routes > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Running Containers: "
+    ice ps > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "IP addresses"
+    ice ip list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Images:"
+    ice images > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    return 0
+}
+
+###################################################################
+# update inventory
+###################################################################
+update_inventory(){
+    local TYPE=$1
+    local NAME=$2
+    local ACTION=$3
+    if [ $# -ne 3 ]; then
+        log_and_echo "$ERROR" "updating inventory expects a three inputs: 1. type 2. name 3. action. Where type is either group or container, and the name is the name of the container being added to the inventory."
+        return 1
+    fi
+    # find the container or group id
+    local ID="undefined"
+    local RESULT=$?
+    if [ "$TYPE" == "ibm_containers" ]; then
+        ice_retry_save_output inspect ${NAME} 2> /dev/null
+        if [ $RESULT -eq 0 ]; then
+            ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
+            if [ -z "${ID}" ]; then
+                log_and_echo "$ERROR" "Could not find container called $NAME"
+                ice ps 2> /dev/null
+                return 1
+            fi
+        else
+            log_and_echo "$ERROR" "ice inspect ${NAME} failed"
+        fi               
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        ice_retry_save_output group inspect ${NAME} 2> /dev/null
+        if [ $RESULT -eq 0 ]; then
+            ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
+            if [ -z "${ID}" ]; then
+                log_and_echo "$ERROR" "Could not find group called $NAME"
+                ice group list 2> /dev/null
+                return 1
+            fi
+        else
+            log_and_echo "$ERROR" "ice group inspect ${NAME} failed"
+        fi        
+    else
+        log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"
+        return 1
+    fi
+
+    local JOB_TYPE=""
+    # trim off junk
+    local temp="${ID%\",}"
+    ID="${temp#\"}"
+    log_and_echo "The ID of the $TYPE is: $ID"
+
+    # find other inventory information
+    log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
+    local IDS_INV_URL="${IDS_URL%/}"
+    local IDS_REQUEST=$TASK_ID
+    local IDS_DEPLOYER=${JOB_NAME##*/}
+    if [ ! -z "$COPYARTIFACT_BUILD_NUMBER" ] ; then
+        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
+        IDS_VERSION=$COPYARTIFACT_BUILD_NUMBER
+    elif [ ! -z "$CS_BUILD_SELECTOR" ] ; then
+        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
+        IDS_VERSION=$CS_BUILD_SELECTOR
+    else
+            IDS_VERSION_TYPE="SCM_REV_ID"
+        if [ ! -z "$GIT_COMMIT" ] ; then
+            IDS_VERSION=$GIT_COMMIT
+        elif [ ! -z "$RTCBuildResultUUID" ] ; then
+            IDS_VERSION=$RTCBuildResultUUID
+        fi
+    fi
+
+    if [ -z "$IDS_RESOURCE" ]; then
+        local IDS_RESOURCE="https://hub.jazz.net/pipeline"
+    fi
+
+    if [ -z "$IDS_VERSION" ]; then
+        local IDS_RESOURCE="1"
+    fi
+
+    IDS_RESOURCE=$CF_SPACE_ID
+    if [ -z "$IDS_RESOURCE" ]; then
+        log_and_echo "$ERROR" "Could not find CF SPACE in environment, using production space id"
+    else
+        # call IBM DevOps Service Inventory CLI to update the entry for this deployment
+        log_and_echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION"
+        bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION
+    fi
+}
+
+###################################################################
 # Unit Test
 ###################################################################
 # internal function, selfcheck unit test to make sure things are working

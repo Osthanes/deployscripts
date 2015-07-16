@@ -18,166 +18,6 @@
 # load helper functions
 source $(dirname "$0")/deploy_utilities.sh
 
-print_run_fail_msg () {
-    log_and_echo ""
-    log_and_echo "When a container cannot be created, the following are a common set of debugging steps."
-    log_and_echo ""
-    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
-    log_and_echo ""
-    log_and_echo "2. Log into IBM Container Service."                                  
-    log_and_echo "      ${green}ice login ${no_color}"
-    log_and_echo "      or" 
-    log_and_echo "      ${green}cf login ${no_color}"
-    log_and_echo ""
-    log_and_echo "2. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
-    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
-    log_and_echo ""
-    log_and_echo "3. Test the container locally."
-    log_and_echo "  a. Pull the image to your computer."
-    log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      or" 
-    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
-    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
-    log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
-    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry.  For example: "
-    log_and_echo "      [fix and update your local Dockerfile]"
-    log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
-    log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
-    log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
-    log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
-    log_and_echo ""
-    log_and_echo "4. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
-    log_and_echo ""
-    log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
-    log_and_echo ""
-}
-
-dump_info () {
-    log_and_echo "$LABEL" "Container Information: "
-    log_and_echo "$LABEL" "Information about this organization and space:"
-    log_and_echo "$INFO" " Summary:"
-    ice_retry_save_output info 2>/dev/null
-    local ICEINFO=$(cat iceretry.log)
-    log_and_echo "$ICEINFO"
-
-
-    # check memory limit, warn user if we're at or approaching the limit
-    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
-    # if memory limit is disabled no need to check and warn
-    if [ ! -z ${MEMORY_LIMIT} ]; then
-        if [ ${MEMORY_LIMIT} -ge 0 ]; then
-            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
-            local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
-
-            if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
-                log_and_echo "$ERROR" "You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used "
-            elif [ ${MEMORY_USAGE} -ge ${MEM_WARNING_LEVEL} ]; then
-                log_and_echo "$WARN" "You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}"
-            fi
-        fi
-    fi
-
-#    export IP_LIMIT=$(echo "$ICEINFO" | grep "Floating IPs limit" | awk '{print $5}')
-#    export IP_COUNT=$(echo "$ICEINFO" | grep "Floating IPs usage" | awk '{print $5}')
-#
-#    local AVAILABLE="$(echo "$IP_LIMIT - $IP_COUNT" | bc)"
-#    if [ ${AVAILABLE} -le 0 ]; then
-#        echo -e "${red}You have reached the default limit for the number of available public IP addresses${no_color}"
-#    else
-#        echo -e "${label_color}You have ${AVAILABLE} public IP addresses remaining${no_color}"
-#    fi
-
-    log_and_echo "Groups: "
-    log_and_echo `ice group list 2> /dev/null`
-    log_and_echo "Routes: "
-    log_and_echo `cf routes`
-    log_and_echo "Running Containers: "
-    log_and_echo `ice ps 2> /dev/null`
-    log_and_echo "Floating IP addresses"
-    log_and_echo `ice ip list 2> /dev/null`
-    log_and_echo "Images:"
-    log_and_echo `ice images`
-    return 0
-}
-
-update_inventory(){
-    local TYPE=$1
-    local NAME=$2
-    local ACTION=$3
-    if [ $# -ne 3 ]; then
-        log_and_echo "$ERROR" "updating inventory expects a three inputs: 1. type 2. name 3. action. Where type is either group or container, and the name is the name of the container being added to the inventory."
-        return 1
-    fi
-    local ID="undefined"
-    # find the container or group id
-    if [ "$TYPE" == "ibm_containers" ]; then
-        ice_retry_save_output inspect ${NAME} 2> /dev/null
-        ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
-        local RESULT=$?
-        if [ $RESULT -ne 0 ]; then
-            log_and_echo "$ERROR" "Could not find container called $NAME"
-            ice ps 2> /dev/null
-            return 1
-        fi
-
-    elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        ice_retry_save_output group inspect ${NAME} 2> /dev/null
-        ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
-        if [ $RESULT -ne 0 ]; then
-            log_and_echo "$ERROR" "Could not find group called $NAME"
-            ice group list 2> /dev/null
-            return 1
-        fi
-    else
-        log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"
-        return 1
-    fi
-
-    local JOB_TYPE=""
-    # trim off junk
-    local temp="${ID%\",}"
-    ID="${temp#\"}"
-    log_and_echo "The ID of the $TYPE is: $ID"
-
-    # find other inventory information
-    log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
-    local IDS_INV_URL="${IDS_URL%/}"
-    local IDS_REQUEST=$TASK_ID
-    local IDS_DEPLOYER=${JOB_NAME##*/}
-    if [ ! -z "$COPYARTIFACT_BUILD_NUMBER" ] ; then
-        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
-        IDS_VERSION=$COPYARTIFACT_BUILD_NUMBER
-    elif [ ! -z "$CS_BUILD_SELECTOR" ] ; then
-        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
-        IDS_VERSION=$CS_BUILD_SELECTOR
-    else
-            IDS_VERSION_TYPE="SCM_REV_ID"
-        if [ ! -z "$GIT_COMMIT" ] ; then
-            IDS_VERSION=$GIT_COMMIT
-        elif [ ! -z "$RTCBuildResultUUID" ] ; then
-            IDS_VERSION=$RTCBuildResultUUID
-        fi
-    fi
-
-    if [ -z "$IDS_RESOURCE" ]; then
-        local IDS_RESOURCE="https://hub.jazz.net/pipeline"
-    fi
-
-    if [ -z "$IDS_VERSION" ]; then
-        local IDS_RESOURCE="1"
-    fi
-
-    IDS_RESOURCE=$CF_SPACE_ID
-    if [ -z "$IDS_RESOURCE" ]; then
-        log_and_echo "$ERROR" "Could not find CF SPACE in environment, using production space id"
-    else
-        # call IBM DevOps Service Inventory CLI to update the entry for this deployment
-        log_and_echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION"
-        bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION
-    fi
-}
-
 insert_inventory(){
     update_inventory $1 $2 "insert"
 }
@@ -197,8 +37,7 @@ wait_for (){
     local STATE="unknown"
     while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "Running") && ("${STATE}" != "Crashed") ]]; do
         let COUNTER=COUNTER+1
-        ice_retry_save_output inspect ${WAITING_FOR} 2> /dev/null
-        STATE=$(grep "Status" iceretry.log | awk '{print $2}' | sed 's/"//g')
+        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
@@ -227,8 +66,7 @@ wait_for_stopped (){
     local FOUND=0
     while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Shutdown")  ]]; do
         let COUNTER=COUNTER+1
-        ice_retry_save_output inspect $ 2> /dev/null
-        STATE=$(grep "Status" iceretry.log | awk '{print $2}' | sed 's/"//g')
+        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then
             STATE="being deleted"
         fi
@@ -298,7 +136,7 @@ deploy_container() {
             log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
             log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME} is not completed"
         fi
-        print_run_fail_msg
+        print_fail_msg "ibm_containers"
     fi
     return ${RESULT}
 }
@@ -464,6 +302,8 @@ clean() {
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${containerName}"
         else
+            log_and_echo "delete inventory: ${containerName}"
+            delete_inventory "ibm_containers" ${containerName}
             log_and_echo "removing previous deployment: ${containerName}"
             ice_retry rm -f ${containerName} 2> /dev/null
             RESULT=$?
@@ -472,7 +312,6 @@ clean() {
                 log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                 return 0
             fi
-            delete_inventory "ibm_containers" ${containerName}
             FIND_PREVIOUS="true"
         fi
         IP_JUST_FOUND=""

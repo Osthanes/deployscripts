@@ -75,7 +75,8 @@ fi
 #   data: group container data in json
 ###################################################################
 get_group_container_data_json() {
-    local data=$(ice --verbose group list  | sed -n '/{/,/}/p')
+    ice_retry_save_output --verbose group list
+    local data=$(sed -n '/{/,/}/p' iceretry.log)
     local RESULT=$?
     if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
         return 1
@@ -203,19 +204,30 @@ get_port_numbers() {
 # normalize memory size - adjust to the allowed set of memory sizes
 ###################################################################
 get_memory() {
-    local CONT_SIZE=$1
+    # make CONT_SIZE all lowercase
+    local CONT_SIZE=${1,,}
     local NEW_MEMORY=256
     # check for container size and set the value as MB
-    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
+    if [ -z "$CONT_SIZE" ] || [ "$CONT_SIZE" == "micro" ] || [ "$CONT_SIZE" == "m1.tiny" ] || [ "$CONT_SIZE" == "256" ];then
         NEW_MEMORY=256
-    elif [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
+    elif [ "$CONT_SIZE" == "tiny" ] || [ "$CONT_SIZE" == "m1.small" ] || [ "$CONT_SIZE" == "512" ]; then
         NEW_MEMORY=512
-    elif [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
+    elif [ "$CONT_SIZE" == "small" ] || [ "$CONT_SIZE" == "m1.medium" ] || [ "$CONT_SIZE" == "1024" ]; then
         NEW_MEMORY=1024
-    elif [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
+    elif [ "$CONT_SIZE" == "medium" ] || [ "$CONT_SIZE" == "m1.large" ] || [ "$CONT_SIZE" == "2048" ]; then
         NEW_MEMORY=2048
+    elif [ "$CONT_SIZE" == "large" ] || [ "$CONT_SIZE" == "4096" ]; then
+        NEW_MEMORY=4096
+    elif [ "$CONT_SIZE" == "x-large" ] || [ "$CONT_SIZE" == "8192" ]; then
+        NEW_MEMORY=8192
+    elif [ "$CONT_SIZE" == "2x-large" ] || [ "$CONT_SIZE" == "16384" ]; then
+        NEW_MEMORY=16384
+    elif [ "$CONT_SIZE" == "pico" ] || [ "$CONT_SIZE" == "64" ]; then
+        NEW_MEMORY=64
+    elif [ "$CONT_SIZE" == "nano" ] || [ "$CONT_SIZE" == "128" ]; then
+        NEW_MEMORY=128
     else
-        echo -e "${red}$CONT_SIZE is an invalid value, defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
+        echo -e "${red}$1 is an invalid value, defaulting to micro (256 MB memory) and continuing deploy process.${no_color}" >&2
         NEW_MEMORY=256
     fi
     echo "$NEW_MEMORY"
@@ -224,9 +236,9 @@ get_memory() {
 ###################################################################
 # check_memory_quota
 ###################################################################
-# this function expects a file "iceinfo.log" to exist in the current director, being the output of a call to 'ice info'
+# this function expects a file "iceretry.log" to exist in the current director, being the output of a call to 'ice info'
 # example:
-#    ice info > iceinfo.log 2> /dev/null
+#    ice info
 #    RESULT=$?
 #    if [ $RESULT -eq 0 ]; then
 #        check_memory_quota()
@@ -238,8 +250,8 @@ get_memory() {
 check_memory_quota() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory "$CONT_SIZE" 2> /dev/null)
-    local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceinfo.log | awk '{print $5}')
-    local MEMORY_USAGE=$(grep "Memory usage (MB)" iceinfo.log | awk '{print $5}')
+    local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
+    local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
         echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
@@ -256,7 +268,7 @@ check_memory_quota() {
 get_memory_size() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory $CONT_SIZE)
-    ice info > iceinfo.log 2> /dev/null
+    ice_retry_save_output ice info
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         $(check_memory_quota $NEW_MEMORY)
@@ -273,6 +285,197 @@ get_memory_size() {
 }
 
 ###################################################################
+# print fail message
+###################################################################
+print_fail_msg () {
+    local TYPE=$1
+    log_and_echo ""
+    log_and_echo "When a ${TYPE} cannot be created, the following are a common set of debugging steps."
+    log_and_echo ""
+    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    log_and_echo ""
+    log_and_echo "2. Log into IBM Container Service."                                  
+    log_and_echo "      ${green}ice login ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}cf login ${no_color}"
+    log_and_echo ""
+    if [ "$TYPE" == "ibm_containers" ]; then
+        log_and_echo "3. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        log_and_echo "3. Run 'ice group create --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+    fi
+    log_and_echo ""
+    log_and_echo "4. Test the container locally."
+    log_and_echo "  a. Pull the image to your computer."
+    log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      or" 
+    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
+    log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
+    log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
+    log_and_echo "  c. If you find an issue with the image locally, fix the issue, and then tag and push the image to your registry.  For example: "
+    log_and_echo "      [fix and update your local Dockerfile]"
+    log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
+    log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
+    if [ "$TYPE" == "ibm_containers" ]; then
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
+        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice group create' command to determine if the container group will now run on Bluemix."
+        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
+    fi
+    log_and_echo ""
+    log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
+    log_and_echo ""
+    log_and_echo "If the image is working locally, a deployment can still fail for a number of reasons. For more information, see the troubleshooting documentation: ${label_color} https://www.ng.bluemix.net/docs/starters/container_troubleshoot.html ${no_color}."
+    log_and_echo ""
+}
+
+###################################################################
+# dump info
+###################################################################
+dump_info () {
+    log_and_echo "$LABEL" "Container Information: "
+    log_and_echo "$LABEL" "Information about this organization and space:"
+    log_and_echo "Summary:"
+    ice_retry_save_output info 2>/dev/null
+    local ICEINFO=$(cat iceretry.log)
+    log_and_echo "$ICEINFO"
+
+    # check memory limit, warn user if we're at or approaching the limit
+    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    # if memory limit is disabled no need to check and warn
+    if [ ! -z ${MEMORY_LIMIT} ]; then
+        if [ ${MEMORY_LIMIT} -ge 0 ]; then
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
+            local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
+
+            if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
+                log_and_echo "$ERROR" "You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used "
+            elif [ ${MEMORY_USAGE} -ge ${MEM_WARNING_LEVEL} ]; then
+                log_and_echo "$WARN" "You are using ${MEMORY_USAGE} MB of memory, which is approaching the limit of ${MEMORY_LIMIT}"
+            fi
+        fi
+    fi
+
+    log_and_echo "$LABEL" "Groups: "
+    ice group list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Routes: "
+    cf routes > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Running Containers: "
+    ice ps > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "IP addresses"
+    ice ip list > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    log_and_echo "$LABEL" "Images:"
+    ice images > mylog.log 2>&1 
+    cat mylog.log
+    log_and_echo "$DEBUGGING" `cat mylog.log`
+
+    return 0
+}
+
+###################################################################
+# update inventory
+###################################################################
+update_inventory(){
+    local TYPE=$1
+    local NAME=$2
+    local ACTION=$3
+    if [ $# -ne 3 ]; then
+        log_and_echo "$ERROR" "updating inventory expects a three inputs: 1. type 2. name 3. action. Where type is either group or container, and the name is the name of the container being added to the inventory."
+        return 1
+    fi
+    # find the container or group id
+    local ID="undefined"
+    local RESULT=$?
+    if [ "$TYPE" == "ibm_containers" ]; then
+        ice_retry_save_output inspect ${NAME} 2> /dev/null
+        if [ $RESULT -eq 0 ]; then
+            ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
+            if [ -z "${ID}" ]; then
+                log_and_echo "$ERROR" "Could not find container called $NAME"
+                ice ps 2> /dev/null
+                return 1
+            fi
+        else
+            log_and_echo "$ERROR" "ice inspect ${NAME} failed"
+        fi               
+    elif [ "${TYPE}" == "ibm_containers_group" ]; then
+        ice_retry_save_output group inspect ${NAME} 2> /dev/null
+        if [ $RESULT -eq 0 ]; then
+            ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
+            if [ -z "${ID}" ]; then
+                log_and_echo "$ERROR" "Could not find group called $NAME"
+                ice group list 2> /dev/null
+                return 1
+            fi
+        else
+            log_and_echo "$ERROR" "ice group inspect ${NAME} failed"
+        fi        
+    else
+        log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"
+        return 1
+    fi
+
+    local JOB_TYPE=""
+    # trim off junk
+    local temp="${ID%\",}"
+    ID="${temp#\"}"
+    log_and_echo "The ID of the $TYPE is: $ID"
+
+    # find other inventory information
+    log_and_echo "$LABEL" "Updating inventory with $TYPE of $NAME "
+    local IDS_INV_URL="${IDS_URL%/}"
+    local IDS_REQUEST=$TASK_ID
+    local IDS_DEPLOYER=${JOB_NAME##*/}
+    if [ ! -z "$COPYARTIFACT_BUILD_NUMBER" ] ; then
+        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
+        IDS_VERSION=$COPYARTIFACT_BUILD_NUMBER
+    elif [ ! -z "$CS_BUILD_SELECTOR" ] ; then
+        IDS_VERSION_TYPE="JENKINS_BUILD_ID"
+        IDS_VERSION=$CS_BUILD_SELECTOR
+    else
+            IDS_VERSION_TYPE="SCM_REV_ID"
+        if [ ! -z "$GIT_COMMIT" ] ; then
+            IDS_VERSION=$GIT_COMMIT
+        elif [ ! -z "$RTCBuildResultUUID" ] ; then
+            IDS_VERSION=$RTCBuildResultUUID
+        fi
+    fi
+
+    if [ -z "$IDS_RESOURCE" ]; then
+        local IDS_RESOURCE="https://hub.jazz.net/pipeline"
+    fi
+
+    if [ -z "$IDS_VERSION" ]; then
+        local IDS_RESOURCE="1"
+    fi
+
+    IDS_RESOURCE=$CF_SPACE_ID
+    if [ -z "$IDS_RESOURCE" ]; then
+        log_and_echo "$ERROR" "Could not find CF SPACE in environment, using production space id"
+    else
+        # call IBM DevOps Service Inventory CLI to update the entry for this deployment
+        log_and_echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION"
+        bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -u $IDS_INV_URL -v $IDS_VERSION
+    fi
+}
+
+###################################################################
 # Unit Test
 ###################################################################
 # internal function, selfcheck unit test to make sure things are working
@@ -282,120 +485,190 @@ unittest() {
 
     # Unit Test for get_memory() function
     #############################################
+    RET=$(get_memory 64 2> /dev/null)
+    if [ "${RET}x" != "64x" ]; then
+        echo "ut fail (bad memory value on check 64)"
+        return 10
+    fi
+    RET=$(get_memory "pico" 2> /dev/null)
+    if [ "${RET}x" != "64x" ]; then
+        echo "ut fail (bad memory value on check pico)"
+        return 11
+    fi
+    RET=$(get_memory 128 2> /dev/null)
+    if [ "${RET}x" != "128x" ]; then
+        echo "ut fail (bad memory value on check 128)"
+        return 12
+    fi
+    RET=$(get_memory "nano" 2> /dev/null)
+    if [ "${RET}x" != "128x" ]; then
+        echo "ut fail (bad memory value on check nano)"
+        return 13
+    fi
     RET=$(get_memory 256 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check 256)"
-        return 10
+        return 14
     fi
     RET=$(get_memory "m1.tiny" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check m1.tiny)"
-        return 11
+        return 15
+    fi
+    RET=$(get_memory "micro" 2> /dev/null)
+    if [ "${RET}x" != "256x" ]; then
+        echo "ut fail (bad memory value on check micro)"
+        return 16
     fi
     RET=$(get_memory 512 2> /dev/null)
     if [ "${RET}x" != "512x" ]; then
         echo "ut fail (bad memory value on check 512)"
-        return 12
+        return 17
     fi
     RET=$(get_memory "m1.small" 2> /dev/null)
     if [ "${RET}x" != "512x" ]; then
         echo "ut fail (bad memory value on check m1.small)"
-        return 13
+        return 18
+    fi
+    RET=$(get_memory "tiny" 2> /dev/null)
+    if [ "${RET}x" != "512x" ]; then
+        echo "ut fail (bad memory value on check tiny)"
+        return 19
     fi
     RET=$(get_memory 1024 2> /dev/null)
     if [ "${RET}x" != "1024x" ]; then
         echo "ut fail (bad memory value on check 1024)"
-        return 14
+        return 20
+    fi
+    RET=$(get_memory "small" 2> /dev/null)
+    if [ "${RET}x" != "1024x" ]; then
+        echo "ut fail (bad memory value on check small)"
+        return 21
     fi
     RET=$(get_memory "m1.medium" 2> /dev/null)
     if [ "${RET}x" != "1024x" ]; then
         echo "ut fail (bad memory value on check m1.medium)"
-        return 15
+        return 22
     fi
     RET=$(get_memory 2048 2> /dev/null)
     if [ "${RET}x" != "2048x" ]; then
         echo "ut fail (bad memory value on check 2048)"
-        return 16
+        return 23
+    fi
+    RET=$(get_memory "medium" 2> /dev/null)
+    if [ "${RET}x" != "2048x" ]; then
+        echo "ut fail (bad memory value on check medium)"
+        return 24
     fi
     RET=$(get_memory "m1.large" 2> /dev/null)
     if [ "${RET}x" != "2048x" ]; then
         echo "ut fail (bad memory value on check m1.large)"
-        return 17
+        return 25
     fi
     RET=$(get_memory 4096 2> /dev/null)
-    if [ "${RET}x" != "256x" ]; then
+    if [ "${RET}x" != "4096x" ]; then
         echo "ut fail (bad memory value on check 4096)"
-        return 18
+        return 26
+    fi
+    RET=$(get_memory "large" 2> /dev/null)
+    if [ "${RET}x" != "4096x" ]; then
+        echo "ut fail (bad memory value on check large)"
+        return 27
+    fi
+    RET=$(get_memory 8192 2> /dev/null)
+    if [ "${RET}x" != "8192x" ]; then
+        echo "ut fail (bad memory value on check 8192)"
+        return 28
+    fi
+    RET=$(get_memory "x-large" 2> /dev/null)
+    if [ "${RET}x" != "8192x" ]; then
+        echo "ut fail (bad memory value on check x-large)"
+        return 29
+    fi
+    RET=$(get_memory 16384 2> /dev/null)
+    if [ "${RET}x" != "16384x" ]; then
+        echo "ut fail (bad memory value on check 16384)"
+        return 30
+    fi
+    RET=$(get_memory "2x-large" 2> /dev/null)
+    if [ "${RET}x" != "16384x" ]; then
+        echo "ut fail (bad memory value on check 2x-large)"
+        return 31
+    fi
+    RET=$(get_memory 32 2> /dev/null)
+    if [ "${RET}x" != "256x" ]; then
+        echo "ut fail (bad memory value on check 32)"
+        return 32
     fi
     RET=$(get_memory "bad_value" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check bad_value)"
-        return 19
+        return 33
     fi
     RET=$(get_memory 1 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on check 1)"
-        return 20
+        return 34
     fi
     RET=$(get_memory "" 2> /dev/null)
     if [ "${RET}x" != "256x" ]; then
         echo "ut fail (bad memory value on empty check)"
-        return 21
+        return 35
     fi
 
     # Unit Test for check_memory_quota() function
     #############################################
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 0" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 0" >>iceretry.log
     $(check_memory_quota 256 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with 256 size)"
-        return 30
+        return 40
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 1024" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 1024" >>iceretry.log
     $(check_memory_quota 2048 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "ut fail (incorrect pass for too much memory 2048+2048)"
-        return 31
+        return 41
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 2048" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 2048" >>iceretry.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "ut fail (incorrect pass for too much memory 2048+512)"
-        return 32
+        return 42
     fi
-    echo "Memory limit (MB)      : 1024" >iceinfo.log
-    echo "Memory usage (MB)      : 0" >>iceinfo.log
+    echo "Memory limit (MB)      : 1024" >iceretry.log
+    echo "Memory usage (MB)      : 0" >>iceretry.log
     $(check_memory_quota 512 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with 512 size)"
-        return 33
+        return 43
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 1024" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 1024" >>iceretry.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 0 ]; then
         echo "ut fail (bad quota check with -1 size)"
-        return 34
+        return 44
     fi
 
-    echo "Memory limit (MB)      : 2048" >iceinfo.log
-    echo "Memory usage (MB)      : 2048" >>iceinfo.log
+    echo "Memory limit (MB)      : 2048" >iceretry.log
+    echo "Memory usage (MB)      : 2048" >>iceretry.log
     $(check_memory_quota -1 2> /dev/null)
     RET=$?
     if [ ${RET} -ne 1 ]; then
         echo "incorrect pass for too much memory 2048+\"-1\")"
-        return 34
+        return 45
     fi
 
     # Unit Test for get_port_numbers() function
@@ -403,52 +676,52 @@ unittest() {
     RET=$(get_port_numbers "80" 2> /dev/null)
     if [ "${RET}x" != "--publish 80x" ]; then
         echo "ut fail (bad publish value on port check \"80\")"
-        return 40
+        return 50
     fi
     RET=$(get_port_numbers "80,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad publish value on port check \"80,8080\")"
-        return 41
+        return 51
     fi
     RET=$(get_port_numbers "80,8080 " 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on trailing space \"80, 8080 \")"
-        return 42
+        return 52
     fi
     RET=$(get_port_numbers "80,8080 ," 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on trailing space and comma \"80, 8080 ,\")"
-        return 43
+        return 53
     fi
     RET=$(get_port_numbers "80, 8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad error check on intervening space \"80, 8080\")"
-        return 44
+        return 54
     fi
     RET=$(get_port_numbers "badvalue" 2> /dev/null)
     if [ "${RET}x" != "--publish 80x" ]; then
         echo "ut fail (bad error check on invalid value)"
-        return 45
+        return 55
     fi
     RET=$(get_port_numbers "80,,,,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on internal commas)"
-        return 46
+        return 56
     fi
     RET=$(get_port_numbers ",,,,80,8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on leading commas)"
-        return 47
+        return 57
     fi
     RET=$(get_port_numbers "80,8080,,,," 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad filtering on trailing commas)"
-        return 48
+        return 58
     fi
     RET=$(get_port_numbers "80    8080" 2> /dev/null)
     if [ "${RET}x" != "--publish 80 --publish 8080x" ]; then
         echo "ut fail (bad check on no commas)"
-        return 49
+        return 59
     fi
 
     return 0

@@ -76,14 +76,19 @@ fi
 ###################################################################
 get_group_container_data_json() {
     ice_retry_save_output --verbose group list
-    local data=$(sed -n '/{/,/}/p' iceretry.log)
     local RESULT=$?
-    if [ $RESULT -ne 0 ] || [ -z "${data}" ]; then
-        return 1
+    if [ $RESULT -eq 0 ]; then
+        local data=$(sed -n '/{/,/}/p' iceretry.log)
+        if [ -z "${data}" ]; then
+            return 1
+        else
+            echo ${data}
+            return 0
+        fi
     else
-        echo ${data}
-        return 0
-    fi
+        return 1
+    fi               
+
 }
 
 ###################################################################
@@ -401,9 +406,10 @@ update_inventory(){
     fi
     # find the container or group id
     local ID="undefined"
-    local RESULT=$?
+    local RESULT=0
     if [ "$TYPE" == "ibm_containers" ]; then
         ice_retry_save_output inspect ${NAME} 2> /dev/null
+        RESULT=$?
         if [ $RESULT -eq 0 ]; then
             ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
             if [ -z "${ID}" ]; then
@@ -413,9 +419,11 @@ update_inventory(){
             fi
         else
             log_and_echo "$ERROR" "ice inspect ${NAME} failed"
+            return 1
         fi               
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
         ice_retry_save_output group inspect ${NAME} 2> /dev/null
+        RESULT=$?
         if [ $RESULT -eq 0 ]; then
             ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
             if [ -z "${ID}" ]; then
@@ -425,6 +433,7 @@ update_inventory(){
             fi
         else
             log_and_echo "$ERROR" "ice group inspect ${NAME} failed"
+            return 1
         fi        
     else
         log_and_echo "$ERROR" "Could not update inventory with unknown type: ${TYPE}"

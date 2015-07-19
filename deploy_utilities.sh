@@ -268,7 +268,7 @@ check_memory_quota() {
 get_memory_size() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory $CONT_SIZE)
-    ice_retry_save_output ice info
+    ice_retry_save_output info
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         $(check_memory_quota $NEW_MEMORY)

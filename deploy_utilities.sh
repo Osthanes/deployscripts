@@ -75,7 +75,7 @@ fi
 #   data: group container data in json
 ###################################################################
 get_group_container_data_json() {
-    ice_retry_save_output --verbose group list
+    ice_retry_save_output --verbose group list >&2
     local RESULT=$?
     if [ $RESULT -eq 0 ]; then
         local data=$(sed -n '/{/,/}/p' iceretry.log)
@@ -273,7 +273,7 @@ check_memory_quota() {
 get_memory_size() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory $CONT_SIZE)
-    ice_retry_save_output info
+    ice_retry_save_output info >&2
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
         $(check_memory_quota $NEW_MEMORY)

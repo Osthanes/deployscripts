@@ -75,7 +75,7 @@ fi
 #   data: group container data in json
 ###################################################################
 get_group_container_data_json() {
-    ice_retry_save_output --verbose group list
+    ice_retry_save_output --verbose group list >&2
     local RESULT=$?
     if [ $RESULT -eq 0 ]; then
         local data=$(sed -n '/{/,/}/p' iceretry.log)

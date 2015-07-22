@@ -190,7 +190,7 @@ get_port_numbers() {
     # check for port as a number separate by commas and replace commas with --publish
     check_num='^[[:digit:][:space:],,]+$'
     if ! [[ "$PORT_NUM" =~ $check_num ]] ; then
-        echo -e "${red}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}" | tee -a "$ERROR_LOG_FILE" >&2
+        echo -e "${red}PORT value is not a number. It should be number separated by commas. Defaulting to port 80 and continue deploy process.${no_color}" >&2
         PORT_NUM=80
     fi
     # let commas split as well as whitespace
@@ -232,7 +232,7 @@ get_memory() {
     elif [ "$CONT_SIZE" == "nano" ] || [ "$CONT_SIZE" == "128" ]; then
         NEW_MEMORY=128
     else
-        echo -e "${red}$1 is an invalid value, defaulting to micro (256 MB memory) and continuing deploy process.${no_color}" | tee -a "$ERROR_LOG_FILE" >&2
+        echo -e "${red}$1 is an invalid value, defaulting to micro (256 MB memory) and continuing deploy process.${no_color}" >&2
         NEW_MEMORY=256
     fi
     echo "$NEW_MEMORY"
@@ -258,7 +258,7 @@ check_memory_quota() {
     local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
     local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
-        echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" | tee -a "$ERROR_LOG_FILE" >&2
+        echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
         if [ $(echo "$MEMORY_LIMIT - $MEMORY_USAGE" | bc) -lt $NEW_MEMORY ]; then
             return 1

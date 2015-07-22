@@ -147,7 +147,7 @@ deploy_simple () {
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}"
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}. $(get_error_info)"
         exit $RESULT
     fi
 }
@@ -161,7 +161,7 @@ deploy_red_black () {
     deploy_container ${MY_CONTAINER_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}. $(get_error_info)"
         exit $RESULT
     fi
 
@@ -169,7 +169,7 @@ deploy_red_black () {
     clean
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed to cleanup previous deployments after deployment of ${MY_CONTAINER_NAME}"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed to cleanup previous deployments after deployment of ${MY_CONTAINER_NAME}. $(get_error_info)"
         exit $RESULT
     fi
     # if we alredy discoved the floating IP in clean(), then we assign it to FLOATING_IP.
@@ -195,7 +195,7 @@ deploy_red_black () {
             if [ -z "${FLOATING_IP}" ];then
                 log_and_echo "$ERROR" "Could not request a new, or reuse an existing IP address "
                 dump_info
-                ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}.  Unable to allocate IP address."
+                ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}.  Unable to allocate IP address. $(get_error_info)"
                 exit 1
             else
                 log_and_echo "Assigning existing IP address $FLOATING_IP"
@@ -213,7 +213,7 @@ deploy_red_black () {
             log_and_echo "Unsetting TEST_URL"
             export TEST_URL=""
             dump_info
-            ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed binding of IP address to ${MY_CONTAINER_NAME}"
+            ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed binding of IP address to ${MY_CONTAINER_NAME}. $(get_error_info)"
             exit 1
         fi
     fi
@@ -356,6 +356,7 @@ if [ -z "$CONTAINER_SIZE" ];then
 else
     RET_MEMORY=$(get_memory_size $CONTAINER_SIZE)
     if [ $RET_MEMORY == -1 ]; then
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed with container size ${CONTAINER_SIZE}. $(get_error_info)"
         exit 1;
     else
         export MEMORY="--memory $RET_MEMORY"

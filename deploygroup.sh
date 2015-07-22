@@ -156,7 +156,7 @@ deploy_group() {
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
         log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists. Please delete it or run group deployment again."
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Deployment of ${MY_GROUP_NAME} failed as the group already exists"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Deployment of ${MY_GROUP_NAME} failed as the group already exists. $(get_error_info)"
         exit 1
     fi
 
@@ -236,8 +236,8 @@ deploy_simple () {
     deploy_group ${MY_GROUP_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        log_and_echo "$ERROR" "Error encountered with simple build strategy for ${CONTAINER_NAME}_${BUILD_NUMBER}"
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment"
+        log_and_echo "$ERROR" "Error encountered with simple build strategy for ${MY_GROUP_NAME}"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_GROUP_NAME}. $(get_error_info)"
         exit $RESULT
     fi
 }
@@ -249,7 +249,7 @@ deploy_red_black () {
     deploy_group ${MY_GROUP_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Deployment of ${MY_GROUP_NAME} failed"
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_GROUP_NAME}. $(get_error_info)"
         exit $RESULT
     fi
 
@@ -257,7 +257,7 @@ deploy_red_black () {
         clean
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
-            ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed to cleanup previous groups after deployment of group ${MY_GROUP_NAME}"
+            ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed to cleanup previous groups after deployment of group ${MY_GROUP_NAME}. $(get_error_info)"
             exit $RESULT
         fi
     else
@@ -454,6 +454,7 @@ if [ -z "$CONTAINER_SIZE" ];then
 else
     RET_MEMORY=$(get_memory_size $CONTAINER_SIZE)
     if [ $RET_MEMORY == -1 ]; then
+        ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed with container size ${CONTAINER_SIZE}. $(get_error_info)"
         exit 1;
     else
         export MEMORY="--memory $RET_MEMORY"

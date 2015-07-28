@@ -101,11 +101,12 @@ map_url_route_to_container_group (){
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
         if [ -z "${VALIDATE_ROUTE}" ]; then
-            VALIDATE_ROUTE=1
+            VALIDATE_ROUTE=0
+            log_and_echo "To validate route using curl, set VALIDATE_ROUTE to 1 in the stage environment variables"
         fi
         if [ $RESULT -eq 0 ]; then
             # loop until the route to container group success with retun code under 400 or time-out.
-            if [ "$VALIDATE_ROUTE" -eq "1" ]; then
+            if [ "$VALIDATE_ROUTE" -ne "0" ]; then
                 local COUNTER=0
                 local RESPONSE="0"
                 log_and_echo "Waiting to get a response code under 400 from curl ${HOSTNAME}.${DOMAIN} command."

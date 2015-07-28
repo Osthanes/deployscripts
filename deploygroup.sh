@@ -100,35 +100,42 @@ map_url_route_to_container_group (){
         log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
+        if [ -z "${VALIDATE_ROUTE}" ]; then
+            VALIDATE_ROUTE=0
+            log_and_echo "To validate route using curl, set VALIDATE_ROUTE to 1 in the stage environment variables"
+        fi
         if [ $RESULT -eq 0 ]; then
-            # loop until the route to container group success with retun code 200 or time-out.
-            local COUNTER=0
-            local RESPONSE="0"
-            log_and_echo "Waiting to get response code 200 from curl ${HOSTNAME}.${DOMAIN} command."
-            if [ "${DEBUG}x" != "1x" ]; then
-                local TIME_OUT=6
-            else
-                local TIME_OUT=270
-            fi
-            while [[ ( $COUNTER -lt $TIME_OUT ) ]]; do
-                let COUNTER=COUNTER+1
-                RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
-                if [ "$RESPONSE" -eq 200 ]; then
-                    log_and_echo "${green}Request to map route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed successfully.${no_color}"
-                    break
-                else
-                    log_and_echo "${WARN}" "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
-                    sleep 10
-                fi
-            done
-            if [ "$RESPONSE" -ne 200 ]; then
+            # loop until the route to container group success with retun code under 400 or time-out.
+            if [ "$VALIDATE_ROUTE" -ne "0" ]; then
+                local COUNTER=0
+                local RESPONSE="0"
+                log_and_echo "Waiting to get a response code under 400 from curl ${HOSTNAME}.${DOMAIN} command."
+                log_and_echo "To disable this check, set VALIDATE_ROUTE to 0 in the stage environment variables"
                 if [ "${DEBUG}x" != "1x" ]; then
-                    log_and_echo "$WARN" "Requested route ('${HOSTNAME}.${DOMAIN}') still being setup."
+                    local TIME_OUT=6
                 else
-                    log_and_echo "$WARN" "Route ${HOSTNAME}.${DOMAIN} does not exist (Response code = ${RESPONSE}.  Please ensure that the routes are setup correctly."
+                    local TIME_OUT=270
                 fi
-                cf routes
-                return 1
+                while [[ ( $COUNTER -lt $TIME_OUT ) ]]; do
+                    let COUNTER=COUNTER+1
+                    RESPONSE=$(curl --write-out %{http_code} --silent --output /dev/null ${HOSTNAME}.${DOMAIN})
+                    if [ "$RESPONSE" -lt 400 ]; then
+                        log_and_echo "${green}Request to map route ('${HOSTNAME}.${DOMAIN}') to container group '${GROUP_NAME}' completed successfully (Response code = ${RESPONSE}).${no_color}"
+                        break
+                    else
+                        log_and_echo "${WARN}" "Requested route ('${HOSTNAME}.${DOMAIN}') did not return successfully (Response code = ${RESPONSE}). Sleep 10 sec and try to check again."
+                        sleep 10
+                    fi
+                done
+                if [ "$RESPONSE" -lt 400 ]; then
+                    if [ "${DEBUG}x" != "1x" ]; then
+                        log_and_echo "$WARN" "Requested route ('${HOSTNAME}.${DOMAIN}') still being setup."
+                    else
+                        log_and_echo "$WARN" "Route ${HOSTNAME}.${DOMAIN} does not exist (Response code = ${RESPONSE}.  Please ensure that the routes are setup correctly."
+                    fi
+                    cf routes
+                    return 1
+                fi
             fi
         else
             log_and_echo "$ERROR" "Failed to route map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."

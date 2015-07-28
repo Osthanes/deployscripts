@@ -105,7 +105,7 @@ map_url_route_to_container_group (){
         fi
         if [ $RESULT -eq 0 ]; then
             # loop until the route to container group success with retun code 200 or time-out.
-            if [ "$VALIDATE_ROUTE" -ne "1" ]; then
+            if [ "$VALIDATE_ROUTE" -eq "1" ]; then
                 local COUNTER=0
                 local RESPONSE="0"
                 log_and_echo "Waiting to get a response code under 400 from curl ${HOSTNAME}.${DOMAIN} command."

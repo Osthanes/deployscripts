@@ -104,7 +104,7 @@ map_url_route_to_container_group (){
             VALIDATE_ROUTE=1
         fi
         if [ $RESULT -eq 0 ]; then
-            # loop until the route to container group success with retun code 200 or time-out.
+            # loop until the route to container group success with retun code under 400 or time-out.
             if [ "$VALIDATE_ROUTE" -eq "1" ]; then
                 local COUNTER=0
                 local RESPONSE="0"

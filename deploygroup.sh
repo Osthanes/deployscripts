@@ -178,8 +178,8 @@ deploy_group() {
     fi
 
     # create the group and check the results
-    log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-    ice_retry group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    ice_retry group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}"
@@ -353,18 +353,31 @@ ${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} copntainer gr
 
 check_num='^[0-9]+$'
 if [ -z "$DESIRED_INSTANCES" ]; then
-    export DESIRED_INSTANCES=1
+    export DESIRED_INSTANCES=2
 elif ! [[ "$DESIRED_INSTANCES" =~ $check_num ]] ; then
-    log_and_echo "$WARN" "DESIRED_INSTANCES value is not a number, defaulting to 1 and continuing deploy process."
-    export DESIRED_INSTANCES=1
+    log_and_echo "$WARN" "DESIRED_INSTANCES value is not a number, defaulting to 2 and continuing deploy process."
+    export DESIRED_INSTANCES=2
+fi
+
+check_num='^[0-9]+$'
+if [ -z "$MIN_INSTANCES" ]; then
+    export MIN_INSTANCES=1
+elif ! [[ "$MIN_INSTANCES" =~ $check_num ]] ; then
+    log_and_echo "$WARN" "MIN_INSTANCES value is not a number, defaulting to 1 and continuing deploy process."
+    export MIN_INSTANCES=1
+fi
+
+if [ $MIN_INSTANCES -gt $DESIRED_INSTANCES ]; then
+    log_and_echo "$WARN" "DESIRED_INSTANCES is greater than MIN_INSTANCES.  Adjusting MIN to be equal to DESIRED."
+    export MIN_INSTANCES=$DESIRED_INSTANCES
 fi
 
 check_num='^[0-9]+$'
 if [ -z "$MAX_INSTANCES" ]; then
-    export MAX_INSTANCES=2
+    export MAX_INSTANCES=10
 elif ! [[ "$MAX_INSTANCES" =~ $check_num ]] ; then
-    log_and_echo "$WARN" "MAX_INSTANCES value is not a number, defaulting to 2 and continuing deploy process."
-    export MAX_INSTANCES=2
+    log_and_echo "$WARN" "MAX_INSTANCES value is not a number, defaulting to 10 and continuing deploy process."
+    export MAX_INSTANCES=10
 fi
 
 if [ $MAX_INSTANCES -lt $DESIRED_INSTANCES ]; then

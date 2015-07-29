@@ -211,12 +211,24 @@ deploy_group() {
                 echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
                 echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
             fi
+			
+			# display failure info, REMOVE LATER
+			FAILED_GROUP=$(ice group inspect $MY_GROUP_NAME | grep "Id" | cut -f2- -d':' | sed 's/,//g')
+			log_and_echo "The group ${MY_GROUP_NAME} failed due to:"
+			log_and_echo "$ERROR" "$FAILED_GROUP"
+			
         else
             log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
         sleep 3
+		
+		# display failure info
+		FAILED_GROUP=$(ice group inspect $MY_GROUP_NAME | grep "Failure" | cut -f2- -d':' | sed 's/,//g')
+		log_and_echo "The group ${MY_GROUP_NAME} failed due to:"
+		log_and_echo "$ERROR" "$FAILED_GROUP"
+		
         ice_retry group rm ${MY_GROUP_NAME}
         if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"

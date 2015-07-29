@@ -224,6 +224,12 @@ deploy_group() {
     elif [ $RESULT -eq 2 ]; then
         log_and_echo "$ERROR" "Failed to create group."
         sleep 3
+		
+        # display failure info
+        FAILED_GROUP=$(ice group inspect $MY_GROUP_NAME | grep "Failure" | cut -f2- -d':' | sed 's/,//g' | sed 's/"//g')
+        log_and_echo "The group ${MY_GROUP_NAME} failed due to:"
+        log_and_echo "$ERROR" "$FAILED_GROUP"
+		
         ice_retry group rm ${MY_GROUP_NAME}
         if [ $? -ne 0 ]; then
             log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"

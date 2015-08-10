@@ -485,6 +485,26 @@ update_inventory(){
 }
 
 ###################################################################
+# check_image
+###################################################################
+check_image() {
+    local NAME=$1
+    if [ -z ${NAME} ]; then
+        log_and_echo "$INFO" "Expected image name to be passed into check_image"
+        return 0
+    fi
+    ice images | grep ${NAME}$ >/dev/null
+    local RC=$?
+    if [ $RC -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+export -f check_image
+
+###################################################################
 # Unit Test
 ###################################################################
 # internal function, selfcheck unit test to make sure things are working
@@ -776,5 +796,4 @@ else
         fi
     fi
 fi
-
 

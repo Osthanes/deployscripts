@@ -97,6 +97,15 @@ deploy_container() {
         log_and_echo "$ERROR" "${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed"
     fi
 
+    # check to see if container image is exisit 
+    check_image "$IMAGE_NAME"
+    local RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        log_and_echo "$ERROR" "Image '${IMAGE_NAME}' does not exist."
+        ice images
+        return 1
+    fi
+
     local BIND_PARMS=""
     # validate the bind_to parameter if one was passed
     if [ ! -z "${BIND_TO}" ]; then
@@ -116,7 +125,7 @@ deploy_container() {
     # run the container and check the results
     log_and_echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
     ice_retry run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} 2> /dev/null
-    local RESULT=$?
+    RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Failed to deploy ${MY_CONTAINER_NAME} using ${IMAGE_NAME}"
         dump_info

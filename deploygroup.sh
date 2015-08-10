@@ -167,6 +167,15 @@ deploy_group() {
         exit 1
     fi
 
+    # check to see if container image is exisit 
+    check_image "$IMAGE_NAME"
+    local RESULT=$?
+    if [ $RESULT -ne 0 ]; then
+        log_and_echo "$ERROR" "Image '${IMAGE_NAME}' does not exist."
+        ice images
+        return 1
+    fi
+
     local BIND_PARMS=""
     # validate the bind_to parameter if one was passed
     if [ ! -z "${BIND_TO}" ]; then

@@ -246,46 +246,42 @@ clean() {
     local containerName=""
     # if we have a requested floating ip, try to use that one instead of any other
     if [ -n "${REQUESTED_FLOATING_IP}" ]; then
-        FLOATING_IP=${REQUESTED_FLOATING_IP}
         # make sure we own this ip
         ice_retry_save_output ip list 2> /dev/null
         RESULT=$?
         if [ $RESULT -ne 0 ]; then 
-            log_and_echo "$WARN" "'ice ip list' command failed with return code ${RESULT}"
-            log_and_echo "$WARN" "Cleaning up previous deployments is not completed, and the requested ip is not being used"
-            return 0
-        fi
-        local find_requested_ip=$(grep "${REQUESTED_FLOATING_IP}" iceretry.log)
-        if [ -z "${find_requested_ip}" ]; then
-            log_and_echo "$WARN" "Requested ip ${REQUESTED_FLOATING_IP} is not assigned to this org and space and cannot be used."
-            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-            return 0
-        fi
-        # is it already in use
-        local old_bound_container=$(echo "${find_requested_ip}" | awk '{print $2}')
-        if [ -n "${old_bound_container}" ]; then
-            # unbind it from the old one first
-            ice_retry ip unbind ${FLOATING_IP} ${old_bound_container} 2> /dev/null
-            RESULT=$?
-            if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'ice ip unbind ${FLOATING_IP} ${old_bound_container}' command failed with return code ${RESULT}"
-                log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                return 0
-            else
-                log_and_echo "Requested ip ${FLOATING_IP} was successfully unbound from previous container ${old_bound_container}"
-            fi
-            # sleep to let it take effect
-            sleep 2
-        fi
-        # bind it to our new container
-        ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -ne 0 ]; then
-            log_and_echo "$WARN" "'ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
-            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-            return 0
+            log_and_echo "$ERROR" "'ice ip list' command failed with return code ${RESULT}"
+            log_and_echo "$ERROR" "The requested ip will not be used"
         else
-            log_and_echo "Requested ip ${FLOATING_IP} was successfully bound to ${CONTAINER_NAME}_${BUILD_NUMBER}"
+            local find_requested_ip=$(grep "${REQUESTED_FLOATING_IP}" iceretry.log)
+            if [ -z "${find_requested_ip}" ]; then
+                log_and_echo "$ERROR" "Requested ip ${REQUESTED_FLOATING_IP} is not assigned to this org and space and cannot be used."
+            else
+                # is it already in use
+                local old_bound_container=$(echo "${find_requested_ip}" | awk '{print $2}')
+                if [ -n "${old_bound_container}" ]; then
+                    # unbind it from the old one first
+                    ice_retry ip unbind ${REQUESTED_FLOATING_IP} ${old_bound_container} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -ne 0 ]; then
+                        log_and_echo "$ERROR" "'ice ip unbind ${REQUESTED_FLOATING_IP} ${old_bound_container}' command failed with return code ${RESULT}"
+                    else
+                        log_and_echo "Requested ip ${REQUESTED_FLOATING_IP} was successfully unbound from previous container ${old_bound_container}"
+                    fi
+                    # sleep to let it take effect
+                    sleep 2
+                fi
+                # bind it to our new container
+                ice_retry ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                RESULT=$?
+                if [ $RESULT -ne 0 ]; then
+                    log_and_echo "$ERROR" "'ice ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                else
+                    # save that it worked, so we don't try to reclaim a different one
+                    FLOATING_IP=${REQUESTED_FLOATING_IP}
+                    log_and_echo "Requested ip ${FLOATING_IP} was successfully bound to ${CONTAINER_NAME}_${BUILD_NUMBER}"
+                fi
+            fi
         fi
     fi
     # add the container name that need to keep in an array

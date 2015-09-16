@@ -253,7 +253,7 @@ clean() {
             log_and_echo "$ERROR" "'ice ip list' command failed with return code ${RESULT}"
             log_and_echo "$ERROR" "The requested ip will not be used"
         else
-            local find_requested_ip=$(grep "${REQUESTED_FLOATING_IP}" iceretry.log)
+            local find_requested_ip=$(grep "\<${REQUESTED_FLOATING_IP}\>" iceretry.log)
             if [ -z "${find_requested_ip}" ]; then
                 log_and_echo "$ERROR" "Requested ip ${REQUESTED_FLOATING_IP} is not assigned to this org and space and cannot be used."
             else

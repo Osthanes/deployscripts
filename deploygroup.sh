@@ -206,6 +206,18 @@ deploy_group() {
     wait_for_group ${MY_GROUP_NAME}
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
+
+        # call the POST_DEPLOY_GROUP hook (if defined)
+        if [ -n "${POST_DEPLOY_GROUP}" ]; then
+            log_and_echo "$INFO" "POST_DEPLOY_GROUP hook is defined - ${POST_DEPLOY_GROUP}"
+            eval ${POST_DEPLOY_GROUP}
+            HOOK_RES=$?
+            if [ $HOOK_RES -ne 0 ]; then
+                log_and_echo "$WARN" "POST_DEPLOY_GROUP hook failed with return code ${HOOK_RES}"
+                return 1
+            fi
+        fi
+
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
 
         # Map route the container group
@@ -329,8 +341,22 @@ clean() {
                 return 0
             fi
             sleep 2
+
+            # call the PRE_REMOVE_GROUP hook (if defined)
+            if [ -n "${PRE_REMOVE_GROUP}" ]; then
+                log_and_echo "$INFO" "PRE_REMOVE_GROUP hook is defined - ${PRE_REMOVE_GROUP}"
+                eval ${PRE_REMOVE_GROUP}
+                HOOK_RES=$?
+                if [ $HOOK_RES -ne 0 ]; then
+                    log_and_echo "$WARN" "PRE_REMOVE_GROUP hook failed with return code ${HOOK_RES}"
+                    log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                    return 0
+                fi
+            fi
+
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
+
             log_and_echo "removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?

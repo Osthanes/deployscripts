@@ -266,6 +266,18 @@ deploy_group() {
     wait_for_group ${MY_GROUP_NAME}
     RESULT=$?
     if [ $RESULT -eq 0 ]; then
+
+        # call the POST_DEPLOY_GROUP hook (if defined)
+        if [ -n "${POST_DEPLOY_GROUP}" ]; then
+            log_and_echo "$INFO" "POST_DEPLOY_GROUP hook is defined - ${POST_DEPLOY_GROUP}"
+            eval ${POST_DEPLOY_GROUP}
+            HOOK_RES=$?
+            if [ $HOOK_RES -ne 0 ]; then
+                log_and_echo "$WARN" "POST_DEPLOY_GROUP hook failed with return code ${HOOK_RES}"
+                return 1
+            fi
+        fi
+
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
 
         # if the IGNORE_MAPPING_ROUTE set, then don't map route the container group
@@ -414,12 +426,26 @@ clean() {
                 fi
                 sleep 2
             done
+
+            # call the PRE_REMOVE_GROUP hook (if defined)
+            if [ -n "${PRE_REMOVE_GROUP}" ]; then
+                log_and_echo "$INFO" "PRE_REMOVE_GROUP hook is defined - ${PRE_REMOVE_GROUP}"
+                eval ${PRE_REMOVE_GROUP}
+                HOOK_RES=$?
+                if [ $HOOK_RES -ne 0 ]; then
+                    log_and_echo "$WARN" "PRE_REMOVE_GROUP hook failed with return code ${HOOK_RES}"
+                    log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                    return 0
+                fi
+            fi
+
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
             if [ $GROUP_WAIT_UNMAP_TIME -gt 0 ]; then
                 log_and_echo "Sleeping $GROUP_WAIT_UNMAP_TIME to allow route unmap to take effect before removing old group. This is to avoid 502 errors from stale containers on the unmapped route. To skip this, at risk of 502 errors, change the env var GROUP_WAIT_UNMAP_TIME to a lower time, or 0 to skip the wait."
                 sleep $GROUP_WAIT_UNMAP_TIME
             fi
+
             log_and_echo "removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?

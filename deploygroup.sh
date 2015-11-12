@@ -325,8 +325,6 @@ clean() {
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 log_and_echo "$WARN" "'ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
-                log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                return 0
             fi
             sleep 2
             log_and_echo "delete inventory: ${groupName}"

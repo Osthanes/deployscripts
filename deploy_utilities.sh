@@ -241,9 +241,9 @@ get_memory() {
 ###################################################################
 # check_memory_quota
 ###################################################################
-# this function expects a file "iceretry.log" to exist in the current director, being the output of a call to 'ice info'
+# this function expects a file "iceretry.log" to exist in the current director, being the output of a call to 'ic info'
 # example:
-#    ice info
+#    ic info
 #    RESULT=$?
 #    if [ $RESULT -eq 0 ]; then
 #        check_memory_quota()
@@ -255,10 +255,15 @@ get_memory() {
 check_memory_quota() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory "$CONT_SIZE" 2> /dev/null)
-    local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
-    local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
+        local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
+    else
+        local MEMORY_LIMIT=$(grep "Memory limit(MB)" iceretry.log | awk '{print $4}')
+        local MEMORY_USAGE=$(grep "Memory usage(MB)" iceretry.log | awk '{print $4}')
+    fi
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
-        echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from ice info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
+        echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from $IC_COMMAND info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
         if [ $(echo "$MEMORY_LIMIT - $MEMORY_USAGE" | bc) -lt $NEW_MEMORY ]; then
             return 1
@@ -283,7 +288,7 @@ get_memory_size() {
             NEW_MEMORY="-1"
         fi
     else
-        echo -e "${red}Unable to call ice info${no_color}" | tee -a "$ERROR_LOG_FILE" >&2 
+        echo -e "${red}Unable to call $IC_COMMAND info${no_color}" | tee -a "$ERROR_LOG_FILE" >&2 
         NEW_MEMORY="-1"
     fi
     echo "$NEW_MEMORY"
@@ -297,26 +302,32 @@ print_fail_msg () {
     log_and_echo ""
     log_and_echo "When a ${TYPE} cannot be created, the following are a common set of debugging steps."
     log_and_echo ""
-    log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        log_and_echo "1. Install Python, Pip, IBM Container Service CLI (ice), Cloud Foundry CLI, and Docker in your environment."
+    else
+        log_and_echo "1. Install Docker, Cloud Foundry CLI (cf), and IBM Container plug-in (cf ic),  in your environment."
+    fi
     log_and_echo ""
     log_and_echo "2. Log into IBM Container Service."                                  
-    log_and_echo "      ${green}ice login ${no_color}"
+    log_and_echo "      ${green}$IC_COMMAND login ${no_color}"
     log_and_echo "      or" 
     log_and_echo "      ${green}cf login ${no_color}"
     log_and_echo ""
     if [ "$TYPE" == "ibm_containers" ]; then
-        log_and_echo "3. Run 'ice run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
-        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
+        log_and_echo "3. Run '$IC_COMMAND run --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}$IC_COMMAND --verbose run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} ${no_color}"
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        log_and_echo "3. Run 'ice group create --verbose' in your current space or try it on another space. Check the output for information about the failure." 
-        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
+        log_and_echo "3. Run '$IC_COMMAND group create --verbose' in your current space or try it on another space. Check the output for information about the failure." 
+        log_and_echo "      ${green}$IC_COMMAND --verbose group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME} ${no_color}"
     fi
     log_and_echo ""
     log_and_echo "4. Test the container locally."
     log_and_echo "  a. Pull the image to your computer."
     log_and_echo "      ${green}docker pull ${IMAGE_NAME} ${no_color}"
-    log_and_echo "      or" 
-    log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        log_and_echo "      or" 
+        log_and_echo "      ${green}ice --local pull ${IMAGE_NAME} ${no_color}"
+    fi
     log_and_echo "  b. Run the container locally by using the Docker run command and allow it to run for several minutes. Verify that the container continues to run. If the container stops, this will cause a crashed container on Bluemix."
     log_and_echo "      ${green}docker run --name=mytestcontainer ${IMAGE_NAME} ${no_color}"
     log_and_echo "      ${green}docker stop mytestcontainer ${no_color}"
@@ -325,11 +336,11 @@ print_fail_msg () {
     log_and_echo "      ${green}docker build -t ${IMAGE_NAME%:*}:test . ${no_color}"
     log_and_echo "      ${green}docker push ${IMAGE_NAME%:*}:test ${no_color}"
     if [ "$TYPE" == "ibm_containers" ]; then
-        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice run' command to determine if the container will now run on Bluemix."
-        log_and_echo "      ${green}ice --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the '$IC_COMMAND run' command to determine if the container will now run on Bluemix."
+        log_and_echo "      ${green}$IC_COMMAND --verbose run --name ${MY_CONTAINER_NAME}_test ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME%:*}:test ${no_color}"
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
-        log_and_echo "  d.  Test the changes to the image on Bluemix using the 'ice group create' command to determine if the container group will now run on Bluemix."
-        log_and_echo "      ${green}ice --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
+        log_and_echo "  d.  Test the changes to the image on Bluemix using the '$IC_COMMAND group create' command to determine if the container group will now run on Bluemix."
+        log_and_echo "      ${green}$IC_COMMAND --verbose group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME%:*}:test ${no_color}"
     fi
     log_and_echo ""
     log_and_echo "5. Once the problem has been diagnosed and fixed, check in the changes to the Dockerfile and project into your IBM DevOps Services project and re-run this Pipeline."
@@ -350,11 +361,15 @@ dump_info () {
     log_and_echo "$ICEINFO"
 
     # check memory limit, warn user if we're at or approaching the limit
-    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
+    else
+        export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $4}')
+    fi
     # if memory limit is disabled no need to check and warn
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then
-            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $4}')
             local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
 
             if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
@@ -366,7 +381,7 @@ dump_info () {
     fi
 
     log_and_echo "$LABEL" "Groups: "
-    ice group list > mylog.log 2>&1 
+    $IC_COMMAND group list > mylog.log 2>&1 
     cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
@@ -376,17 +391,17 @@ dump_info () {
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "Running Containers: "
-    ice ps > mylog.log 2>&1 
+    $IC_COMMAND ps > mylog.log 2>&1 
     cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "IP addresses"
-    ice ip list > mylog.log 2>&1 
+    $IC_COMMAND ip list > mylog.log 2>&1 
     cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
     log_and_echo "$LABEL" "Images:"
-    ice images > mylog.log 2>&1 
+    $IC_COMMAND images > mylog.log 2>&1 
     cat mylog.log
     log_and_echo "$DEBUGGING" `cat mylog.log`
 
@@ -414,11 +429,11 @@ update_inventory(){
             ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
             if [ -z "${ID}" ]; then
                 log_and_echo "$ERROR" "Could not find container called $NAME"
-                ice ps 2> /dev/null
+                $IC_COMMAND ps 2> /dev/null
                 return 1
             fi
         else
-            log_and_echo "$ERROR" "ice inspect ${NAME} failed"
+            log_and_echo "$ERROR" "$IC_COMMAND inspect ${NAME} failed"
             return 1
         fi               
     elif [ "${TYPE}" == "ibm_containers_group" ]; then
@@ -428,11 +443,11 @@ update_inventory(){
             ID=$(grep "\"Id\":" iceretry.log | awk '{print $2}')
             if [ -z "${ID}" ]; then
                 log_and_echo "$ERROR" "Could not find group called $NAME"
-                ice group list 2> /dev/null
+                $IC_COMMAND group list 2> /dev/null
                 return 1
             fi
         else
-            log_and_echo "$ERROR" "ice group inspect ${NAME} failed"
+            log_and_echo "$ERROR" "$IC_COMMAND group inspect ${NAME} failed"
             return 1
         fi        
     else
@@ -493,11 +508,36 @@ check_image() {
         log_and_echo "$INFO" "Expected image name to be passed into check_image"
         return 0
     fi
-    ice images | grep ${NAME}$ >/dev/null
+    ice_retry_save_output images
     local RC=$?
     if [ $RC -eq 0 ]; then
-        return 0
+        if [ "$USE_ICE_CLI" = "1" ]; then
+            grep ${NAME} iceretry.log >/dev/null
+            RC=$?
+            if [ $RC -eq 0 ]; then
+                return 0
+            else
+                return 1
+            fi
+        else
+            local IMAGE_NAME=$(cut -d : -f 1 <<< $NAME)
+            local IMAGE_VERSION=$(cut -d : -f 2 <<< $NAME)
+            local VERSION_LIST=$(grep ${IMAGE_NAME} iceretry.log | awk '{print $2}')
+            RC=$?
+            if [ $RC -ne 0 ] || [ -z "${VERSION_LIST}" ]; then
+                return 1
+            else
+                for VER in ${VERSION_LIST[@]} 
+                do 
+                    if [ $VER -eq $IMAGE_VERSION ]; then 
+                        return 0
+                    fi
+                done  
+    	        return 1
+            fi
+        fi
     else
+        log_and_echo "$ERROR" "'cf ic images' command failed with return code ${RESULT}"
         return 1
     fi
 }

@@ -37,7 +37,7 @@ wait_for (){
     local STATE="unknown"
     while [[ ( $COUNTER -lt 180 ) && ("${STATE}" != "Running") && ("${STATE}" != "Crashed") ]]; do
         let COUNTER=COUNTER+1
-        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
+        STATE=$($IC_COMMAND inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then
             STATE="being placed"
         fi
@@ -66,7 +66,7 @@ wait_for_stopped (){
     local FOUND=0
     while [[ ( $COUNTER -lt 60 ) && ("${STATE}" != "Shutdown")  ]]; do
         let COUNTER=COUNTER+1
-        STATE=$(ice inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
+        STATE=$($IC_COMMAND inspect $WAITING_FOR 2> /dev/null | grep "Status" | awk '{print $2}' | sed 's/"//g')
         if [ -z "${STATE}" ]; then
             STATE="being deleted"
         fi
@@ -91,7 +91,7 @@ deploy_container() {
     fi
 
     # check to see if that container name is already in use
-    ice inspect ${MY_CONTAINER_NAME} > /dev/null
+    $IC_COMMAND inspect ${MY_CONTAINER_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
         log_and_echo "$ERROR" "${MY_CONTAINER_NAME} already exists.  Please remove these containers or change the Name of the container or group being deployed"
@@ -102,7 +102,7 @@ deploy_container() {
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Image '${IMAGE_NAME}' does not exist."
-        ice images
+        $IC_COMMAND images
         return 1
     fi
 
@@ -120,10 +120,14 @@ deploy_container() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             log_and_echo "$WARN" "No services appear to be bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
         fi
-        BIND_PARMS="--bind ${BIND_TO}"
+        if [ "$USE_ICE_CLI" = "1" ]; then
+            BIND_PARMS="--bind ${BIND_TO}"
+        else
+            BIND_PARMS="-e CCS_BIND_SRV=${BIND_TO}"
+        fi
     fi
     # run the container and check the results
-    log_and_echo "run the container: ice run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
+    log_and_echo "run the container: $IC_COMMAND run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} "
     ice_retry run --name ${MY_CONTAINER_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} ${IMAGE_NAME} 2> /dev/null
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
@@ -142,7 +146,7 @@ deploy_container() {
         log_and_echo "$WARN" "The container was removed successfully."
         ice_retry rm ${MY_CONTAINER_NAME} 2> /dev/null
         if [ $? -ne 0 ]; then
-            log_and_echo "$WARN" "'ice rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
+            log_and_echo "$WARN" "'$IC_COMMAND rm ${MY_CONTAINER_NAME}' command failed with return code ${RESULT}"
             log_and_echo "$WARN" "Removing Container instance ${MY_CONTAINER_NAME} is not completed"
         fi
         print_fail_msg "ibm_containers"
@@ -187,7 +191,7 @@ deploy_red_black () {
     fi
 
     # check to see that I obtained a floating IP address
-    #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log
+    #$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log
     #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
     if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then
         log_and_echo "Requesting IP"
@@ -198,7 +202,7 @@ deploy_red_black () {
             log_and_echo "$WARN" "Failed to request new IP address, will attempt to reuse existing IP"
             ice_retry_save_output ip list 2> /dev/null
             FLOATING_IP=$(grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[[:space:]]*$' iceretry.log | head -n 1)
-            #FLOATING_IP=$(ice ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
+            #FLOATING_IP=$($IC_COMMAND ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
             #strip off whitespace
             FLOATING_IP=${FLOATING_IP// /}
             if [ -z "${FLOATING_IP}" ];then
@@ -250,7 +254,7 @@ clean() {
         ice_retry_save_output ip list 2> /dev/null
         RESULT=$?
         if [ $RESULT -ne 0 ]; then 
-            log_and_echo "$ERROR" "'ice ip list' command failed with return code ${RESULT}"
+            log_and_echo "$ERROR" "'$IC_COMMAND ip list' command failed with return code ${RESULT}"
             log_and_echo "$ERROR" "The requested ip will not be used"
         else
             local find_requested_ip=$(grep "\<${REQUESTED_FLOATING_IP}\>" iceretry.log)
@@ -264,7 +268,7 @@ clean() {
                     ice_retry ip unbind ${REQUESTED_FLOATING_IP} ${old_bound_container} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -ne 0 ]; then
-                        log_and_echo "$ERROR" "'ice ip unbind ${REQUESTED_FLOATING_IP} ${old_bound_container}' command failed with return code ${RESULT}"
+                        log_and_echo "$ERROR" "'$IC_COMMAND ip unbind ${REQUESTED_FLOATING_IP} ${old_bound_container}' command failed with return code ${RESULT}"
                     else
                         log_and_echo "Requested ip ${REQUESTED_FLOATING_IP} was successfully unbound from previous container ${old_bound_container}"
                     fi
@@ -275,7 +279,7 @@ clean() {
                 ice_retry ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                 RESULT=$?
                 if [ $RESULT -ne 0 ]; then
-                    log_and_echo "$ERROR" "'ice ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                    log_and_echo "$ERROR" "'$IC_COMMAND ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
                 else
                     # save that it worked, so we don't try to reclaim a different one
                     FLOATING_IP=${REQUESTED_FLOATING_IP}
@@ -290,11 +294,16 @@ clean() {
         KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
     done
     # add the current containers in an array of the container name
-    ice_retry_save_output ps -q 2> /dev/null
-    local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $2}')
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        ice_retry_save_output ps -q 2> /dev/null
+        local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $2}')
+    else
+        ice_retry_save_output ps 2> /dev/null
+        local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $14}')
+    fi   
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
-        log_and_echo "$WARN" "'ice ps -q' command failed with return code ${RESULT}"
+        log_and_echo "$WARN" "'$IC_COMMAND ps -q' command failed with return code ${RESULT}"
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
     fi
@@ -329,7 +338,7 @@ clean() {
                     ice_retry ip unbind ${FLOATING_IP} ${containerName} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -ne 0 ]; then
-                        log_and_echo "$WARN" "'ice ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "'$IC_COMMAND ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
                         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                         return 0
                     fi
@@ -337,7 +346,7 @@ clean() {
                     ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -ne 0 ]; then
-                        log_and_echo "$WARN" "'ice ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "'$IC_COMMAND ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
                         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                         return 0
                     fi
@@ -346,7 +355,7 @@ clean() {
         fi
         if [ $CONTAINER_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
             log_and_echo "$WARN" "The container ${containerName} version is greater then the current build number ${BUILD_NUMBER} and it will not be removed."
-            log_and_echo "$WARN" "You may remove it with the ice cli command 'ice rm -f ${containerName}'"
+            log_and_echo "$WARN" "You may remove it with the $IC_COMMAND cli command '$IC_COMMAND rm -f ${containerName}'"
         elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${containerName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${containerName}"
@@ -357,7 +366,7 @@ clean() {
             ice_retry rm -f ${containerName} 2> /dev/null
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'ice rm -f ${containerName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "'$IC_COMMAND rm -f ${containerName}' command failed with return code ${RESULT}"
                 log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                 return 0
             fi

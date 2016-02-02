@@ -445,7 +445,7 @@ if [ -z "${ROUTE_HOSTNAME}" ]; then
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 
     log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
-    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $2}')
+    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $3}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
         cf domains > domains.log 
         FOUND=''

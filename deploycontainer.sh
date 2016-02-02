@@ -309,7 +309,7 @@ clean() {
         if [ "$USE_ICE_CLI" = "1" ]; then
             local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $2}')
         else
-            local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $14}')
+            local CONTAINER_NAME_ARRAY=$(grep -oh -e "${CONTAINER_NAME}_[0-9]\+" iceretry.log)
         fi   
     fi
     # loop through the array of the container name and check which one it need to keep

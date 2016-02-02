@@ -306,13 +306,17 @@ clean() {
     if [ "$USE_ICE_CLI" = "1" ]; then
         # get list of the continer name by given attribute="Name" and search_value=${CONTAINER_NAME}
         GROUP_NAME_ARRAY=$(get_list_container_group_value_for_given_attribute "Name" ${CONTAINER_NAME})
+        RESULT=$?
     else
         ice_retry_save_output group list
-        GROUP_NAME_ARRAY=$(awk 'NR>=2 {print $2}' iceretry.log | grep ${CONTAINER_NAME})
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            GROUP_NAME_ARRAY=$(awk 'NR>=2 {print $2}' iceretry.log | grep ${CONTAINER_NAME})
+        fi
     fi
-    RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$WARN" "'$IC_COMMAND --verbose group list' command failed with return code ${RESULT}"
+        log_and_echo "$DEBUGGING" `cat iceretry.log`
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
     fi

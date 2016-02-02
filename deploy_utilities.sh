@@ -21,6 +21,10 @@
 # uncomment the next line to debug this script
 #set -x
 
+debugme() {
+  [[ $DEBUG = 1 ]] && "$@" || :
+}
+
 ###################################################################
 # protect against logging functions not being loaded              #
 #    An older version of the extension will not have them loaded  #

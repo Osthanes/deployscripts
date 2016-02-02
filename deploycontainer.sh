@@ -296,16 +296,21 @@ clean() {
     # add the current containers in an array of the container name
     if [ "$USE_ICE_CLI" = "1" ]; then
         ice_retry_save_output ps -q 2> /dev/null
-        local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $2}')
     else
         ice_retry_save_output ps 2> /dev/null
-        local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $14}')
     fi   
     RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$WARN" "'$IC_COMMAND ps -q' command failed with return code ${RESULT}"
+        log_and_echo "$DEBUGGING" `cat iceretry.log`
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
+    else
+        if [ "$USE_ICE_CLI" = "1" ]; then
+            local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $2}')
+        else
+            local CONTAINER_NAME_ARRAY=$(grep ${CONTAINER_NAME} iceretry.log | awk '{print $14}')
+        fi   
     fi
     # loop through the array of the container name and check which one it need to keep
     for containerName in ${CONTAINER_NAME_ARRAY[@]}

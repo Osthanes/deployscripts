@@ -123,7 +123,7 @@ deploy_container() {
         if [ "$USE_ICE_CLI" = "1" ]; then
             BIND_PARMS="--bind ${BIND_TO}"
         else
-            BIND_PARMS="-e CCS_BIND_SRV=${BIND_TO}"
+            BIND_PARMS="-e CCS_BIND_APP=${BIND_TO}"
         fi
     fi
     # run the container and check the results

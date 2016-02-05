@@ -246,8 +246,9 @@ deploy_group() {
         log_and_echo "$ERROR" "$FAILED_GROUP"
 		
         ice_retry group rm ${MY_GROUP_NAME}
-        if [ $? -ne 0 ]; then
-            log_and_echo "$WARN" "'$IC_COMMAND group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
+        local RC=$?
+        if [ $RC -ne 0 ]; then
+            log_and_echo "$WARN" "'$IC_COMMAND group rm ${MY_GROUP_NAME}' command failed with return code ${RC}"
             log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
         else 
             log_and_echo "$WARN" "The group was removed successfully."

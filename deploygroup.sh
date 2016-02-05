@@ -43,7 +43,7 @@ wait_for_group (){
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
         STATUS=$($IC_COMMAND group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
-        if [ -z "${STATUS}" ]; then
+        if [ -z "${STATUS}" ] && [ "$USE_ICE_CLI" = "1" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
@@ -52,6 +52,8 @@ wait_for_group (){
         if [ "${STATUS}" == "CREATE_COMPLETE" ] || [ "${STATUS}" == "\"CREATE_COMPLETE\"" ]; then
             return 0
         elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
+            return 2
+        elif [ "${STATUS}" == "FAILED" ] || [ "${STATUS}" == "\"FAILED\"" ]; then
             return 2
         fi
         sleep 3

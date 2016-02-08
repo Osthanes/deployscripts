@@ -54,7 +54,7 @@ wait_for_group (){
         elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
             return 2
         elif [ "${STATUS}" == "FAILED" ] || [ "${STATUS}" == "\"FAILED\"" ]; then
-            return 2
+            return 3
         fi
         sleep 3
     done
@@ -236,7 +236,7 @@ deploy_group() {
         else
             log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
         fi
-    elif [ $RESULT -eq 2 ]; then
+    elif [ $RESULT -eq 2 ] || [ $RESULT -eq 3 ]; then
         log_and_echo "$ERROR" "Failed to create group."
         sleep 3
 		
@@ -244,16 +244,17 @@ deploy_group() {
         FAILED_GROUP=$($IC_COMMAND group inspect $MY_GROUP_NAME | grep "Failure" | cut -f2- -d':' | sed 's/,//g' | sed 's/"//g')
         log_and_echo "The group ${MY_GROUP_NAME} failed due to:"
         log_and_echo "$ERROR" "$FAILED_GROUP"
-		
-        ice_retry group rm ${MY_GROUP_NAME}
-        local RC=$?
-        if [ $RC -ne 0 ]; then
-            log_and_echo "$WARN" "'$IC_COMMAND group rm ${MY_GROUP_NAME}' command failed with return code ${RC}"
-            log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
-        else 
-            log_and_echo "$WARN" "The group was removed successfully."
+        if [ $RESULT -eq 2 ]; then		
+            ice_retry group rm ${MY_GROUP_NAME}
+            local RC=$?
+            if [ $RC -ne 0 ]; then
+                log_and_echo "$WARN" "'$IC_COMMAND group rm ${MY_GROUP_NAME}' command failed with return code ${RC}"
+                log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
+            else 
+                log_and_echo "$WARN" "The group was removed successfully."
+            fi
+            print_fail_msg "ibm_containers_group"
         fi
-        print_fail_msg "ibm_containers_group"
     else
         log_and_echo "$ERROR" "Failed to deploy group"
     fi

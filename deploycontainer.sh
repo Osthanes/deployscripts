@@ -280,6 +280,40 @@ clean() {
                     # sleep to let it take effect
                     sleep 2
                 fi
+                # if the IC_COMMAND is cf ic, then it need to unbind the IP assigned
+                # to container during cf ic run and also release the IP.
+                if [ "$USE_ICE_CLI" != "1" ]; then
+                    # did it discovere a public IP address, then we need to replace with REQUESTED_FLOATING_IP
+                    log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${containerName}, then replace with ${REQUESTED_FLOATING_IP}"
+                    ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -eq 0 ]; then
+                        local THE_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
+                        temp="${THE_FLOATING_IP%\"}"
+                        THE_FLOATING_IP="${temp#\"}"
+                        if [ -n "${THE_FLOATING_IP}" ]; then
+                            log_and_echo "Discovered IP is ${THE_FLOATING_IP}"
+                            ice_retry ip unbind ${THE_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                            RESULT=$?
+                            if [ $RESULT -ne 0 ]; then
+                                log_and_echo "$ERROR" "'$IC_COMMAND ip unbind ${THE_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                            else
+                                log_and_echo "The ip ${THE_FLOATING_IP} was successfully unbound from current container ${CONTAINER_NAME}_${BUILD_NUMBER}"
+                            fi
+                            # sleep to let it take effect
+                            sleep 2
+                            ice_retry ip release ${THE_FLOATING_IP} 2> /dev/null
+                            RESULT=$?
+                            if [ $RESULT -eq 0 ]; then
+                                log_and_echo "The ip ${THE_FLOATING_IP} was successfully release"
+                            else
+                                log_and_echo "$ERROR" "'$IC_COMMAND ip release ${THE_FLOATING_IP}' command failed with return code ${RESULT}"
+                            fi
+                            # sleep to let it take effect
+                            sleep 2
+                        fi
+                    fi
+                fi
                 # bind it to our new container
                 ice_retry ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                 RESULT=$?
@@ -293,6 +327,7 @@ clean() {
             fi
         fi
     fi
+
     # add the container name that need to keep in an array
     for (( i = 0 ; i < $CONCURRENT_VERSIONS ; i++ ))
     do
@@ -353,12 +388,22 @@ clean() {
                         return 0
                     fi
                     sleep 2
-                    ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                    RESULT=$?
-                    if [ $RESULT -ne 0 ]; then
-                        log_and_echo "$WARN" "'$IC_COMMAND ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
-                        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                        return 0
+                    if [ "$USE_ICE_CLI" = "1" ]; then
+                        ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                        RESULT=$?
+                        if [ $RESULT -ne 0 ]; then
+                            log_and_echo "$WARN" "'$IC_COMMAND ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                            return 0
+                        fi
+                    else
+                        ice_retry ip release ${THE_FLOATING_IP} 2> /dev/null
+                        RESULT=$?
+                        if [ $RESULT -eq 0 ]; then
+                            log_and_echo "The ip ${THE_FLOATING_IP} was successfully release"
+                        else
+                            log_and_echo "$ERROR" "'$IC_COMMAND ip release ${THE_FLOATING_IP}' command failed with return code ${RESULT}"
+                        fi
                     fi
                 fi
             fi

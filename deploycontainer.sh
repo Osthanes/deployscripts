@@ -202,9 +202,14 @@ deploy_red_black () {
         if [ -z "${FLOATING_IP}" ];then
             log_and_echo "No any free IP address found. Requesting new IP"
             ice_retry_save_output ip request 2> /dev/null
-            FLOATING_IP=$(awk '{print $3}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            if [ "$USE_ICE_CLI" = "1" ]; then
+                FLOATING_IP=$(awk '{print $4}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            else
+                FLOATING_IP=$(awk '{print $3}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            fi
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
+                cat iceretry.log
                 log_and_echo "$ERROR" "Could not request a new, or reuse an existing IP address "
                 dump_info
                 ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}.  Unable to allocate IP address. $(get_error_info)"
@@ -221,6 +226,7 @@ deploy_red_black () {
         ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
         RESULT=$?
         if [ $RESULT -ne 0 ]; then
+            cat iceretry.log
             log_and_echo "$ERROR" "Failed to bind ${FLOATING_IP} to ${CONTAINER_NAME}_${BUILD_NUMBER} "
             log_and_echo "Unsetting TEST_URL"
             export TEST_URL=""

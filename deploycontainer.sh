@@ -191,33 +191,32 @@ deploy_red_black () {
     fi
 
     # check to see that I obtained a floating IP address
-    #$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log
+    #ice inspect ${CONTAINER_NAME}_${BUILD_NUMBER} > inspect.log
     #FLOATING_IP=$(cat inspect.log | grep "PublicIpAddress" | awk '{print $2}')
     if [ "${FLOATING_IP}" = '""' ] || [ -z "${FLOATING_IP}" ]; then
-        log_and_echo "Requesting IP"
-        ice_retry_save_output ip request 2> /dev/null
-        FLOATING_IP=$(awk '{print $4}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
-        RESULT=$?
-        if [ $RESULT -ne 0 ]; then
-            log_and_echo "$WARN" "Failed to request new IP address, will attempt to reuse existing IP"
-            ice_retry_save_output ip list 2> /dev/null
-            FLOATING_IP=$(grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[[:space:]]*$' iceretry.log | head -n 1)
-            #FLOATING_IP=$($IC_COMMAND ip list 2> /dev/null | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -n 1)
-            #strip off whitespace
-            FLOATING_IP=${FLOATING_IP// /}
-            if [ -z "${FLOATING_IP}" ];then
+        log_and_echo "Check for the free IP, will attempt to reuse existing IP"
+        ice_retry_save_output ip list 2> /dev/null
+        FLOATING_IP=$(grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[[:space:]]*$' iceretry.log | head -n 1)
+        #strip off whitespace
+        FLOATING_IP=${FLOATING_IP// /}
+        if [ -z "${FLOATING_IP}" ];then
+            log_and_echo "No any free IP address found. Requesting new IP"
+            ice_retry_save_output ip request 2> /dev/null
+            FLOATING_IP=$(awk '{print $3}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            RESULT=$?
+            if [ $RESULT -ne 0 ]; then
                 log_and_echo "$ERROR" "Could not request a new, or reuse an existing IP address "
                 dump_info
                 ${EXT_DIR}/utilities/sendMessage.sh -l bad -m "Failed deployment of ${MY_CONTAINER_NAME}.  Unable to allocate IP address. $(get_error_info)"
                 exit 1
             else
-                log_and_echo "Assigning existing IP address $FLOATING_IP"
+                # strip off junk
+                temp="${FLOATING_IP%\"}"
+                FLOATING_IP="${temp#\"}"
+                log_and_echo "Assign new IP address $FLOATING_IP"
             fi
         else
-            # strip off junk
-            temp="${FLOATING_IP%\"}"
-            FLOATING_IP="${temp#\"}"
-            log_and_echo "Assigning new IP address $FLOATING_IP"
+            log_and_echo "Reuse an existing IP address $FLOATING_IP"
         fi
         ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
         RESULT=$?

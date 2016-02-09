@@ -238,6 +238,8 @@ deploy_group() {
             else
                 log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
             fi
+        else
+            log_and_echo "Ignore mapping map route the container group"
         fi
     elif [ $RESULT -eq 2 ] || [ $RESULT -eq 3 ]; then
         log_and_echo "$ERROR" "Failed to create group."

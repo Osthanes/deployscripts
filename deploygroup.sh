@@ -42,16 +42,16 @@ wait_for_group (){
     local STATUS="unknown"
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        STATUS=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        STATUS=$(ice group inspect $WAITING_FOR | grep '"Status"' | awk '{print $2}' | sed 's/[,"]//g')
         if [ -z "${STATUS}" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
         fi
         log_and_echo "${WAITING_FOR} is ${STATUS}"
-        if [ "${STATUS}" == "CREATE_COMPLETE" ] || [ "${STATUS}" == "\"CREATE_COMPLETE\"" ]; then
+        if [[ "${STATUS}" =~ "COMPLETE" ]]; then
             return 0
-        elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
+        elif [[ "${STATUS}" =~ "FAILED" ]]; then
             return 2
         fi
         sleep 3

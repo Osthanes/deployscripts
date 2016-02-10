@@ -399,7 +399,7 @@ clean() {
                     A_FLOATING_IP="${temp#\"}"
                     if [ -n "${A_FLOATING_IP}" ]; then
                        log_and_echo "Discovered previous IP ${A_FLOATING_IP}"
-                       IP_JUST_FOUND=$FLOATING_IP
+                       IP_JUST_FOUND=$A_FLOATING_IP
                     fi
                 fi
             fi

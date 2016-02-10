@@ -328,7 +328,8 @@ clean() {
         fi
     elif [ "$USE_ICE_CLI" != "1" ]; then
         # if the IC_COMMAND is cf ic, then it need to use discovered public IP address
-        log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${containerName}"
+        log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${CONTAINER_NAME}_${BUILD_NUMBER}"
+        sleep 10
         ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
@@ -338,7 +339,12 @@ clean() {
             if [ -n "${FOUND_FLOATING_IP}" ]; then
                 FLOATING_IP=${FOUND_FLOATING_IP}
                 log_and_echo "Discovered ip is ${FLOATING_IP}"
+            else
+                log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}"
             fi
+        else
+           log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
+           log_and_echo "$DEBUGGING" `cat iceretry.log`
         fi
     fi
     # add the container name that need to keep in an array
@@ -438,6 +444,8 @@ clean() {
                         else
                             log_and_echo "$ERROR" "'$IC_COMMAND ip release ${IP_JUST_FOUND}' command failed with return code ${RESULT}"
                         fi
+                    else
+                        log_and_echo "${containerName} does not have PublicIpAddress"
                     fi
                 fi
             fi

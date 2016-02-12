@@ -370,6 +370,7 @@ clean() {
                         fi
                     else
                         log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
+                    fi
                 else
                     A_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
                     temp="${A_FLOATING_IP%\"}"

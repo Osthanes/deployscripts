@@ -431,12 +431,12 @@ clean() {
         IP_JUST_FOUND=""
     done
     if [ FIND_PREVIOUS="false" ]; then
-        if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
-            FLOATING_IP=$NEW_DISCOVERED_IP
-        fi
         log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
+    fi
+    if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
+        FLOATING_IP=$NEW_DISCOVERED_IP
     fi
     if [ -n "${FLOATING_IP}" ]; then
        log_and_echo "Discovered previous IP ${FLOATING_IP}"

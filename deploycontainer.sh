@@ -395,7 +395,6 @@ clean() {
                         fi
                         sleep 2
                     fi
-                    fi
                     ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -ne 0 ]; then

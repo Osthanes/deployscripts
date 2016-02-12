@@ -252,7 +252,29 @@ clean() {
     local FIND_PREVIOUS="false"
     local FLOATING_IP=""
     local IP_JUST_FOUND=""
+    local NEW_DISCOVERED_IP=""
     local containerName=""
+    if [ "$USE_ICE_CLI" != "1" ]; then
+        # if the IC_COMMAND is cf ic, then it need to use discovered public IP address
+        log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${CONTAINER_NAME}_${BUILD_NUMBER}"
+        sleep 10
+        ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            local FOUND_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
+            temp="${FOUND_FLOATING_IP%\"}"
+            FOUND_FLOATING_IP="${temp#\"}"
+            if [ -n "${FOUND_FLOATING_IP}" ]; then
+                NEW_DISCOVERED_IP=${FOUND_FLOATING_IP}
+                log_and_echo "New iscovered ip is ${NEW_DISCOVERED_IP}"
+            else
+                log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}"
+            fi
+        else
+           log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
+           log_and_echo "$DEBUGGING" `cat iceretry.log`
+        fi
+    fi
     # if we have a requested floating ip, try to use that one instead of any other
     if [ -n "${REQUESTED_FLOATING_IP}" ]; then
         # make sure we own this ip
@@ -280,39 +302,15 @@ clean() {
                     # sleep to let it take effect
                     sleep 2
                 fi
-                # if the IC_COMMAND is cf ic, then it need to unbind the IP assigned
-                # to container during cf ic run and also release the IP.
-                if [ "$USE_ICE_CLI" != "1" ]; then
-                    # did it discovere a public IP address, then we need to replace with REQUESTED_FLOATING_IP
-                    log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${containerName}, then replace with ${REQUESTED_FLOATING_IP}"
-                    ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
+                    ice_retry ip release ${NEW_DISCOVERED_IP} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -eq 0 ]; then
-                        local THE_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-                        temp="${THE_FLOATING_IP%\"}"
-                        THE_FLOATING_IP="${temp#\"}"
-                        if [ -n "${THE_FLOATING_IP}" ]; then
-                            log_and_echo "Discovered IP is ${THE_FLOATING_IP}"
-                            ice_retry ip unbind ${THE_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                            RESULT=$?
-                            if [ $RESULT -ne 0 ]; then
-                                log_and_echo "$ERROR" "'$IC_COMMAND ip unbind ${THE_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
-                            else
-                                log_and_echo "The ip ${THE_FLOATING_IP} was successfully unbound from current container ${CONTAINER_NAME}_${BUILD_NUMBER}"
-                            fi
-                            # sleep to let it take effect
-                            sleep 2
-                            ice_retry ip release ${THE_FLOATING_IP} 2> /dev/null
-                            RESULT=$?
-                            if [ $RESULT -eq 0 ]; then
-                                log_and_echo "The ip ${THE_FLOATING_IP} was successfully release"
-                            else
-                                log_and_echo "$ERROR" "'$IC_COMMAND ip release ${THE_FLOATING_IP}' command failed with return code ${RESULT}"
-                            fi
-                            # sleep to let it take effect
-                            sleep 2
-                        fi
+                        log_and_echo "The new discovered ip ${NEW_DISCOVERED_IP} was successfully release"
+                    else
+                        log_and_echo "$ERROR" "'$IC_COMMAND ip release ${NEW_DISCOVERED_IP}' command failed with return code ${RESULT}"
                     fi
+                    sleep 2
                 fi
                 # bind it to our new container
                 ice_retry ip bind ${REQUESTED_FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
@@ -325,26 +323,6 @@ clean() {
                     log_and_echo "Requested ip ${FLOATING_IP} was successfully bound to ${CONTAINER_NAME}_${BUILD_NUMBER}"
                 fi
             fi
-        fi
-    elif [ "$USE_ICE_CLI" != "1" ]; then
-        # if the IC_COMMAND is cf ic, then it need to use discovered public IP address
-        log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${CONTAINER_NAME}_${BUILD_NUMBER}"
-        sleep 10
-        ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            local FOUND_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-            temp="${FOUND_FLOATING_IP%\"}"
-            FOUND_FLOATING_IP="${temp#\"}"
-            if [ -n "${FOUND_FLOATING_IP}" ]; then
-                FLOATING_IP=${FOUND_FLOATING_IP}
-                log_and_echo "Discovered ip is ${FLOATING_IP}"
-            else
-                log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}"
-            fi
-        else
-           log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
-           log_and_echo "$DEBUGGING" `cat iceretry.log`
         fi
     fi
     # add the container name that need to keep in an array
@@ -380,72 +358,50 @@ clean() {
             RESULT=$?
             if [ $RESULT -eq 0 ]; then
                 log_and_echo "Found container ${containerName}"
-                if [ "$USE_ICE_CLI" = "1" ]; then
-                    # does it have a public IP address
-                    if [ -z "${FLOATING_IP}" ]; then
-                        FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-                        temp="${FLOATING_IP%\"}"
-                        FLOATING_IP="${temp#\"}"
-                        if [ -n "${FLOATING_IP}" ]; then
-                           log_and_echo "Discovered previous IP ${FLOATING_IP}"
-                           IP_JUST_FOUND=$FLOATING_IP
-                        fi
-                    else
-                        log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
+                # does it have a public IP address
+                if [ -z "${FLOATING_IP}" ]; then
+                    FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
+                    temp="${FLOATING_IP%\"}"
+                    FLOATING_IP="${temp#\"}"
+                    if [ -n "${FLOATING_IP}" ]; then
+                       log_and_echo "Discovered previous IP ${FLOATING_IP}"
+                       IP_JUST_FOUND=$FLOATING_IP
                     fi
                 else
-                    A_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-                    temp="${A_FLOATING_IP%\"}"
-                    A_FLOATING_IP="${temp#\"}"
-                    if [ -n "${A_FLOATING_IP}" ]; then
-                       log_and_echo "Discovered previous IP ${A_FLOATING_IP}"
-                       IP_JUST_FOUND=$A_FLOATING_IP
-                    fi
+                    log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
                 fi
             fi
             if [[ "$containerName" != *"$BUILD_NUMBER"* ]]; then
                 # this is a previous deployment
-                if [ "$USE_ICE_CLI" = "1" ]; then
-                    if [ -z "${FLOATING_IP}" ]; then
-                        log_and_echo "${containerName} did not have a floating IP so will need to discover one from previous deployment or allocate one"
-                    elif [ -n "${IP_JUST_FOUND}" ]; then
-                        log_and_echo "${containerName} had a floating ip ${FLOATING_IP}"
-                        ice_retry ip unbind ${FLOATING_IP} ${containerName} 2> /dev/null
-                        RESULT=$?
-                        if [ $RESULT -ne 0 ]; then
-                            log_and_echo "$WARN" "'$IC_COMMAND ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
-                            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                            return 0
-                        fi
-                        sleep 2
-                        ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-                        RESULT=$?
-                        if [ $RESULT -ne 0 ]; then
-                            log_and_echo "$WARN" "'$IC_COMMAND ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
-                            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                            return 0
-                        fi
-                    fi
-                else
-                    if [ -n "${IP_JUST_FOUND}" ]; then
-                        log_and_echo "${containerName} had a floating ip ${IP_JUST_FOUND}"
-                        ice_retry ip unbind ${IP_JUST_FOUND} ${containerName} 2> /dev/null
-                        RESULT=$?
-                        if [ $RESULT -ne 0 ]; then
-                            log_and_echo "$WARN" "'$IC_COMMAND ip unbind ${IP_JUST_FOUND} ${containerName}' command failed with return code ${RESULT}"
-                            log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
-                            return 0
-                        fi
-                        sleep 2
-                        ice_retry ip release ${IP_JUST_FOUND} 2> /dev/null
+                if [ -z "${FLOATING_IP}" ]; then
+                    log_and_echo "${containerName} did not have a floating IP so will need to discover one from previous deployment or allocate one"
+                elif [ -n "${IP_JUST_FOUND}" ]; then
+                    log_and_echo "${containerName} had a floating ip ${FLOATING_IP}"
+                    ice_retry ip unbind ${FLOATING_IP} ${containerName} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -ne 0 ]; then
+                        log_and_echo "$WARN" "'$IC_COMMAND ip unbind ${FLOATING_IP} ${containerName}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                        return 0
+                    fi   
+                    sleep 2                    
+                    if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
+                        ice_retry ip release ${NEW_DISCOVERED_IP} 2> /dev/null
                         RESULT=$?
                         if [ $RESULT -eq 0 ]; then
-                            log_and_echo "The ip ${IP_JUST_FOUND} was successfully release"
+                            log_and_echo "The new discovered ip ${NEW_DISCOVERED_IP} was successfully release"
                         else
-                            log_and_echo "$ERROR" "'$IC_COMMAND ip release ${IP_JUST_FOUND}' command failed with return code ${RESULT}"
+                            log_and_echo "$ERROR" "'$IC_COMMAND ip release ${NEW_DISCOVERED_IP}' command failed with return code ${RESULT}"
                         fi
-                    else
-                        log_and_echo "${containerName} does not have PublicIpAddress"
+                        sleep 2
+                    fi
+                    fi
+                    ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+                    RESULT=$?
+                    if [ $RESULT -ne 0 ]; then
+                        log_and_echo "$WARN" "'$IC_COMMAND ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}"
+                        log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
+                        return 0
                     fi
                 fi
             fi
@@ -472,6 +428,9 @@ clean() {
         IP_JUST_FOUND=""
     done
     if [ FIND_PREVIOUS="false" ]; then
+        if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
+            FLOATING_IP=$NEW_DISCOVERED_IP
+        fi
         log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"

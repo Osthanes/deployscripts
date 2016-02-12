@@ -358,9 +358,11 @@ clean() {
             RESULT=$?
             if [ $RESULT -eq 0 ]; then
                 log_and_echo "Found container ${containerName}"
-                if [ "$USE_ICE_CLI" = "1" ]; then
-                    # does it have a public IP address
-                    if [ -z "${FLOATING_IP}" ]; then
+                # does it have a public IP address
+                if [ -z "${FLOATING_IP}" ]; then
+                    if [ "$USE_ICE_CLI" != "1" ] && [ $CONTAINER_VERSION_NUMBER -eq $BUILD_NUMBER ]; then
+                        log_and_echo "Did not search for previous IP because the cuntainer build number $CONTAINER_VERSION_NUMBER is the current build number"
+                    else
                         FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
                         temp="${FLOATING_IP%\"}"
                         FLOATING_IP="${temp#\"}"
@@ -368,17 +370,9 @@ clean() {
                            log_and_echo "Discovered previous IP ${FLOATING_IP}"
                            IP_JUST_FOUND=$FLOATING_IP
                         fi
-                    else
-                        log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
                     fi
                 else
-                    A_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-                    temp="${A_FLOATING_IP%\"}"
-                    A_FLOATING_IP="${temp#\"}"
-                    if [ -n "${A_FLOATING_IP}" ]; then
-                       log_and_echo "Discovered previous IP ${A_FLOATING_IP}"
-                       IP_JUST_FOUND=$A_FLOATING_IP
-                    fi
+                    log_and_echo "Did not search for previous IP because we have already discovered $FLOATING_IP"
                 fi
             fi
             if [[ "$containerName" != *"$BUILD_NUMBER"* ]]; then

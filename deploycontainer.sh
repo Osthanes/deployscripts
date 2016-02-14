@@ -266,7 +266,7 @@ clean() {
             FOUND_FLOATING_IP="${temp#\"}"
             if [ -n "${FOUND_FLOATING_IP}" ]; then
                 NEW_DISCOVERED_IP=${FOUND_FLOATING_IP}
-                log_and_echo "New iscovered ip is ${NEW_DISCOVERED_IP}"
+                log_and_echo "New discovered ip is ${NEW_DISCOVERED_IP}"
             else
                 log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}"
             fi
@@ -435,7 +435,7 @@ clean() {
     else
         log_and_echo "Cleaned up previous deployments"
     fi
-    if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
+    if [ "$USE_ICE_CLI" != "1" ] && [ -z "${FLOATING_IP}" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
         FLOATING_IP=$NEW_DISCOVERED_IP
     fi
     if [ -n "${FLOATING_IP}" ]; then

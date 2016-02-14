@@ -257,23 +257,30 @@ clean() {
     if [ "$USE_ICE_CLI" != "1" ]; then
         # if the IC_COMMAND is cf ic, then it need to use discovered public IP address
         log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${CONTAINER_NAME}_${BUILD_NUMBER}"
-        sleep 10
-        ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-        RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            local FOUND_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-            temp="${FOUND_FLOATING_IP%\"}"
-            FOUND_FLOATING_IP="${temp#\"}"
-            if [ -n "${FOUND_FLOATING_IP}" ]; then
-                NEW_DISCOVERED_IP=${FOUND_FLOATING_IP}
-                log_and_echo "New discovered ip is ${NEW_DISCOVERED_IP}"
+        local RC=0
+        local retries=0
+        while [ $retries -lt 6 ]; do
+            sleep 10
+            ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
+            RESULT=$?
+            if [ $RESULT -eq 0 ]; then
+                local FOUND_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
+                temp="${FOUND_FLOATING_IP%\"}"
+                FOUND_FLOATING_IP="${temp#\"}"
+                if [ -n "${FOUND_FLOATING_IP}" ]; then
+                    NEW_DISCOVERED_IP=${FOUND_FLOATING_IP}
+                    log_and_echo "New discovered ip is ${NEW_DISCOVERED_IP}"
+                    break
+                else
+                    log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}, Sleep 10 sec and try again."
+                fi
             else
-                log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}"
+               log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
+               log_and_echo "$DEBUGGING" `cat iceretry.log`
+               break
             fi
-        else
-           log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
-           log_and_echo "$DEBUGGING" `cat iceretry.log`
-        fi
+            retries=$(( $retries + 1 ))
+        done
     fi
     # if we have a requested floating ip, try to use that one instead of any other
     if [ -n "${REQUESTED_FLOATING_IP}" ]; then

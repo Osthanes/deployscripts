@@ -312,10 +312,16 @@ print_fail_msg () {
         log_and_echo "1. Install Docker, Cloud Foundry CLI (cf), and IBM Container plug-in (cf ic),  in your environment."
     fi
     log_and_echo ""
-    log_and_echo "2. Log into IBM Container Service."                                  
-    log_and_echo "      ${green}$IC_COMMAND login ${no_color}"
-    log_and_echo "      or" 
-    log_and_echo "      ${green}cf login ${no_color}"
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        log_and_echo "2. Log into IBM Container Service."                                  
+        log_and_echo "      ${green}$IC_COMMAND login ${no_color}"
+        log_and_echo "      or" 
+        log_and_echo "      ${green}cf login ${no_color}"
+    else
+        log_and_echo "2. Log into IBM Container Service."                                  
+        log_and_echo "      ${green}cf login ${no_color}"
+        log_and_echo "      ${green}cf ic init ${no_color}"
+    fi
     log_and_echo ""
     if [ "$TYPE" == "ibm_containers" ]; then
         log_and_echo "3. Run '$IC_COMMAND run --verbose' in your current space or try it on another space. Check the output for information about the failure." 

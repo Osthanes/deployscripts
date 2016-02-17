@@ -42,8 +42,8 @@ wait_for_group (){
     local STATUS="unknown"
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        STATUS=$(ice group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
-        if [ -z "${STATUS}" ]; then
+        STATUS=$($IC_COMMAND group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        if [ -z "${STATUS}" ] && [ "$USE_ICE_CLI" = "1" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
@@ -53,6 +53,8 @@ wait_for_group (){
             return 0
         elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
             return 2
+        elif [ "${STATUS}" == "FAILED" ] || [ "${STATUS}" == "\"FAILED\"" ]; then
+            return 3
         fi
         sleep 3
     done
@@ -97,7 +99,7 @@ map_url_route_to_container_group (){
 
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
-        log_and_echo "map route to container group: ice route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
+        log_and_echo "map route to container group: $IC_COMMAND route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
         if [ -z "${VALIDATE_ROUTE}" ]; then
@@ -159,7 +161,7 @@ deploy_group() {
     fi
 
     # check to see if that group name is already in use
-    ice group inspect ${MY_GROUP_NAME} > /dev/null
+    $IC_COMMAND group inspect ${MY_GROUP_NAME} > /dev/null
     local FOUND=$?
     if [ ${FOUND} -eq 0 ]; then
         log_and_echo "$ERROR" "${MY_GROUP_NAME} already exists. Please delete it or run group deployment again."
@@ -172,7 +174,7 @@ deploy_group() {
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Image '${IMAGE_NAME}' does not exist."
-        ice images
+        $IC_COMMAND images
         return 1
     fi
 
@@ -190,12 +192,16 @@ deploy_group() {
         if [ $SERVICES_BOUND -ne 0 ]; then
             log_and_echo "$WARN" "No services appear to be bound to ${BIND_TO}.  Please confirm that you have bound the intended services to the application."
         fi
-        BIND_PARMS="--bind ${BIND_TO}"
+        if [ "$USE_ICE_CLI" = "1" ]; then
+            BIND_PARMS="--bind ${BIND_TO}"
+        else
+            BIND_PARMS="-e CCS_BIND_APP=${BIND_TO}"
+        fi
     fi
 
     # create the group and check the results
-    log_and_echo "creating group: ice group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
-    ice_retry group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
+    log_and_echo "creating group: $IC_COMMAND group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    ice_retry group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
         log_and_echo "$ERROR" "Failed to deploy ${MY_GROUP_NAME} using ${IMAGE_NAME}"
@@ -208,45 +214,52 @@ deploy_group() {
     if [ $RESULT -eq 0 ]; then
         insert_inventory "ibm_containers_group" ${MY_GROUP_NAME}
 
-        # Map route the container group
-        if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
-            map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
-            RET=$?
-            if [ $RET -eq 0 ]; then
-                log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
-            else
-                if [ "${DEBUG}x" != "1x" ]; then
-                    log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
+        # if the IGNORE_MAPPING_ROUTE set, then don't map route the container group
+        if [ -z "${IGNORE_MAPPING_ROUTE}" ]; then
+            # Map route the container group
+            if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
+                map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
+                RET=$?
+                if [ $RET -eq 0 ]; then
+                    log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
                 else
-                    log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
+                    if [ "${DEBUG}x" != "1x" ]; then
+                        log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
+                    else
+                        log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
+                    fi
                 fi
-            fi
-            if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
-                TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
-                echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
-                echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+                if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+                    TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
+                    echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
+                    echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
+                    echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+                fi
+            else
+                log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
             fi
         else
-            log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
+            log_and_echo "Ignore mapping map route the container group"
         fi
-    elif [ $RESULT -eq 2 ]; then
+    elif [ $RESULT -eq 2 ] || [ $RESULT -eq 3 ]; then
         log_and_echo "$ERROR" "Failed to create group."
         sleep 3
 		
         # display failure info
-        FAILED_GROUP=$(ice group inspect $MY_GROUP_NAME | grep "Failure" | cut -f2- -d':' | sed 's/,//g' | sed 's/"//g')
+        FAILED_GROUP=$($IC_COMMAND group inspect $MY_GROUP_NAME | grep "Failure" | cut -f2- -d':' | sed 's/,//g' | sed 's/"//g')
         log_and_echo "The group ${MY_GROUP_NAME} failed due to:"
         log_and_echo "$ERROR" "$FAILED_GROUP"
-		
-        ice_retry group rm ${MY_GROUP_NAME}
-        if [ $? -ne 0 ]; then
-            log_and_echo "$WARN" "'ice group rm ${MY_GROUP_NAME}' command failed with return code ${RESULT}"
-            log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
-        else 
-            log_and_echo "$WARN" "The group was removed successfully."
+        if [ $RESULT -eq 2 ]; then		
+            ice_retry group rm ${MY_GROUP_NAME}
+            local RC=$?
+            if [ $RC -ne 0 ]; then
+                log_and_echo "$WARN" "'$IC_COMMAND group rm ${MY_GROUP_NAME}' command failed with return code ${RC}"
+                log_and_echo "$WARN" "Removing the failed group ${MY_GROUP_NAME} is not completed"
+            else 
+                log_and_echo "$WARN" "The group was removed successfully."
+            fi
+            print_fail_msg "ibm_containers_group"
         fi
-        print_fail_msg "ibm_containers_group"
     else
         log_and_echo "$ERROR" "Failed to deploy group"
     fi
@@ -299,11 +312,20 @@ clean() {
         KEEP_BUILD_NUMBERS[$i]="${CONTAINER_NAME}_$(($BUILD_NUMBER-$i))"
     done
     # add the current group in an array of the group name
-    # get list of the continer name by given attribute="Name" and search_value=${CONTAINER_NAME}
-    GROUP_NAME_ARRAY=$(get_list_container_group_value_for_given_attribute "Name" ${CONTAINER_NAME})
-    RESULT=$?
+    if [ "$USE_ICE_CLI" = "1" ]; then
+        # get list of the continer name by given attribute="Name" and search_value=${CONTAINER_NAME}
+        GROUP_NAME_ARRAY=$(get_list_container_group_value_for_given_attribute "Name" ${CONTAINER_NAME})
+        RESULT=$?
+    else
+        ice_retry_save_output group list
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+            GROUP_NAME_ARRAY=$(awk 'NR>=2 {print $2}' iceretry.log | grep ${CONTAINER_NAME})
+        fi
+    fi
     if [ $RESULT -ne 0 ]; then
-        log_and_echo "$WARN" "'ice --verbose group list' command failed with return code ${RESULT}"
+        log_and_echo "$WARN" "'$IC_COMMAND --verbose group list' command failed with return code ${RESULT}"
+        log_and_echo "$DEBUGGING" `cat iceretry.log`
         log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
         return 0
     fi
@@ -314,7 +336,7 @@ clean() {
         GROUP_VERSION_NUMBER=$(echo $groupName | sed 's#.*_##g')
         if [ $GROUP_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
             log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not be removed."
-            log_and_echo "$WARN" "You may remove it with the ice cli command 'ice group rm ${groupName}'"
+            log_and_echo "$WARN" "You may remove it with the $IC_COMMAND cli command '$IC_COMMAND group rm ${groupName}'"
         elif [[ " ${KEEP_BUILD_NUMBERS[*]} " == *" ${groupName} "* ]]; then
             # this is the concurrent version so keep it around
             log_and_echo "keeping deployment: ${groupName}"
@@ -324,7 +346,7 @@ clean() {
             ice_retry route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'ice route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "'$IC_COMMAND route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
             fi
             sleep 2
             log_and_echo "delete inventory: ${groupName}"
@@ -333,7 +355,7 @@ clean() {
             ice_retry group rm ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "'$IC_COMMAND group rm ${groupName}' command failed with return code ${RESULT}"
                 log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                 return 0
             fi
@@ -345,7 +367,7 @@ clean() {
             ice_retry group rm ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'ice group rm ${groupName}' command failed with return code ${RESULT}"
+                log_and_echo "$WARN" "'$IC_COMMAND group rm ${groupName}' command failed with return code ${RESULT}"
                 log_and_echo "$WARN" "Cleaning up previous deployments is not completed"
                 return 0
             fi
@@ -432,7 +454,7 @@ if [ -z "${ROUTE_HOSTNAME}" ]; then
 # generate a route if one does not exist 
 if [ -z "${ROUTE_DOMAIN}" ]; then 
     log_and_echo "ROUTE_DOMAIN not set, will attempt to find existing route domain to use. ${label_color} ROUTE_DOMAIN can be set as an environment property on the stage${no_color}"
-    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $2}')
+    export ROUTE_DOMAIN=$(cf routes | tail -1 | grep -E '[a-z0-9]\.' | awk '{print $3}')
     if [ -z "${ROUTE_DOMAIN}" ]; then 
         cf domains > domains.log 
         FOUND=''

@@ -259,13 +259,8 @@ get_memory() {
 check_memory_quota() {
     local CONT_SIZE=$1
     local NEW_MEMORY=$(get_memory "$CONT_SIZE" 2> /dev/null)
-    if [ "$USE_ICE_CLI" = "1" ]; then
-        local MEMORY_LIMIT=$(grep "Memory limit (MB)" iceretry.log | awk '{print $5}')
-        local MEMORY_USAGE=$(grep "Memory usage (MB)" iceretry.log | awk '{print $5}')
-    else
-        local MEMORY_LIMIT=$(grep "Memory limit(MB)" iceretry.log | awk '{print $4}')
-        local MEMORY_USAGE=$(grep "Memory usage(MB)" iceretry.log | awk '{print $4}')
-    fi
+    local MEMORY_LIMIT=$(grep -i "Memory Limit" iceretry.log | awk '{print $NF}')
+    local MEMORY_USAGE=$(grep -i "Memory Usage" iceretry.log | awk '{print $NF}')
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
         echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from $IC_COMMAND info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
@@ -371,19 +366,11 @@ dump_info () {
     log_and_echo "$ICEINFO"
 
     # check memory limit, warn user if we're at or approaching the limit
-    if [ "$USE_ICE_CLI" = "1" ]; then
-        export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $5}')
-    else
-        export MEMORY_LIMIT=$(echo "$ICEINFO" | grep "Memory limit" | awk '{print $4}')
-    fi
+    export MEMORY_LIMIT=$(echo "$ICEINFO" | grep -i "Memory Limit" | awk '{print $NF}')
     # if memory limit is disabled no need to check and warn
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then
-            if [ "$USE_ICE_CLI" = "1" ]; then
-                export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
-            else
-                export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $4}')
-            fi
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep -i "Memory Usage" | awk '{print $NF}')
             local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
 
             if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then

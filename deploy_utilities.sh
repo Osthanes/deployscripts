@@ -370,11 +370,7 @@ dump_info () {
     # if memory limit is disabled no need to check and warn
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then
-            if [ "$USE_ICE_CLI" = "1" ]; then
-                export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $5}')
-            else
-                export MEMORY_USAGE=$(echo "$ICEINFO" | grep "Memory usage" | awk '{print $4}')
-            fi
+            export MEMORY_USAGE=$(echo "$ICEINFO" | grep -i "Memory Usage" | awk '{print $NF}')
             local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
 
             if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then

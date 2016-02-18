@@ -367,7 +367,6 @@ dump_info () {
 
     # check memory limit, warn user if we're at or approaching the limit
     export MEMORY_LIMIT=$(echo "$ICEINFO" | grep -i "Memory Limit" | awk '{print $NF}')
-    fi
     # if memory limit is disabled no need to check and warn
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then

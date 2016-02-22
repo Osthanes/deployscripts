@@ -58,7 +58,7 @@ wait_for_group (){
         fi
         sleep 3
     done
-    log_and_echo "$ERROR" "Failed to start group"
+    log_and_echo "$ERROR" "Create group is not completed and stays in status '${STATUS}'"
     return 1
 }
 

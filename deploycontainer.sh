@@ -339,9 +339,9 @@ clean() {
     done
     # add the current containers in an array of the container name
     if [ "$USE_ICE_CLI" = "1" ]; then
-        ice_retry_save_output ps -q 2> /dev/null
+        ice_retry_save_output ps -q -a 2> /dev/null
     else
-        ice_retry_save_output ps 2> /dev/null
+        ice_retry_save_output ps -a 2> /dev/null
     fi   
     RESULT=$?
     if [ $RESULT -ne 0 ]; then

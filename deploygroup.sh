@@ -48,7 +48,7 @@ wait_for_group (){
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
         fi
-        local TIMESTAMP = `date`
+        local TIMESTAMP=`date`
         log_and_echo "${TIMESTAMP}: ${WAITING_FOR} is ${STATUS}"
         if [ "${STATUS}" == "CREATE_COMPLETE" ] || [ "${STATUS}" == "\"CREATE_COMPLETE\"" ]; then
             return 0
@@ -100,7 +100,7 @@ map_url_route_to_container_group (){
 
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
-        local TIMESTAMP = `date`
+        local TIMESTAMP=`date`
         log_and_echo "${TIMESTAMP}: map route to container group: $IC_COMMAND route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
@@ -155,7 +155,7 @@ map_url_route_to_container_group (){
 
 deploy_group() {
     local MY_GROUP_NAME=$1
-    local TIMESTAMP = `date`
+    local TIMESTAMP=`date`
     log_and_echo "${TIMESTAMP}: deploying group ${MY_GROUP_NAME}"
 
     if [ -z MY_GROUP_NAME ];then
@@ -203,7 +203,7 @@ deploy_group() {
     fi
 
     # create the group and check the results
-    TIMESTAMP = `date`
+    TIMESTAMP=`date`
     log_and_echo "${TIMESTAMP}: creating group: $IC_COMMAND group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
     ice_retry group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
@@ -225,7 +225,7 @@ deploy_group() {
                 map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
                 RET=$?
                 if [ $RET -eq 0 ]; then
-                    TIMESTAMP = `date`
+                    TIMESTAMP=`date`
                     log_and_echo "${TIMESTAMP}: Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
                 else
                     if [ "${DEBUG}x" != "1x" ]; then
@@ -283,7 +283,7 @@ deploy_simple () {
 }
 
 deploy_red_black () {
-    local TIMESTAMP = `date`
+    local TIMESTAMP=`date`
     log_and_echo "${TIMESTAMP}: $LABEL" "Example red_black container deploy "
     # deploy new version of the application
     local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
@@ -308,7 +308,7 @@ deploy_red_black () {
 }
 
 clean() {
-    local TIMESTAMP = `date`
+    local TIMESTAMP=`date`
     log_and_echo "${TIMESTAMP}: Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
     local RESULT=0
     local FIND_PREVIOUS="false"
@@ -369,10 +369,10 @@ clean() {
             fi
              FIND_PREVIOUS="true"
         else
-            TIMESTAMP = `date`
+            TIMESTAMP=`date`
             log_and_echo "${TIMESTAMP}: delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
-            TIMESTAMP = `date`
+            TIMESTAMP=`date`
             log_and_echo "${TIMESTAMP}: removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?
@@ -385,7 +385,7 @@ clean() {
         fi
 
     done
-    TIMESTAMP = `date`
+    TIMESTAMP=`date`
     if [ FIND_PREVIOUS="false" ]; then
         log_and_echo "${TIMESTAMP}: No previous deployments found to clean up"
     else

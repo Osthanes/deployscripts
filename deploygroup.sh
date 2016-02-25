@@ -48,7 +48,8 @@ wait_for_group (){
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"
             STATUS=$require_value
         fi
-        log_and_echo "${WAITING_FOR} is ${STATUS}"
+        local TIMESTAMP = `date`
+        log_and_echo "${TIMESTAMP}: ${WAITING_FOR} is ${STATUS}"
         if [ "${STATUS}" == "CREATE_COMPLETE" ] || [ "${STATUS}" == "\"CREATE_COMPLETE\"" ]; then
             return 0
         elif [ "${STATUS}" == "CREATE_FAILED" ] || [ "${STATUS}" == "\"CREATE_FAILED\"" ]; then
@@ -99,7 +100,8 @@ map_url_route_to_container_group (){
 
     if [ $RESULT -eq 0 ]; then
         # Map hostnameName.domainName to the container group.
-        log_and_echo "map route to container group: $IC_COMMAND route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
+        local TIMESTAMP = `date`
+        log_and_echo "${TIMESTAMP}: map route to container group: $IC_COMMAND route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
         if [ -z "${VALIDATE_ROUTE}" ]; then
@@ -153,7 +155,8 @@ map_url_route_to_container_group (){
 
 deploy_group() {
     local MY_GROUP_NAME=$1
-    log_and_echo "deploying group ${MY_GROUP_NAME}"
+    local TIMESTAMP = `date`
+    log_and_echo "${TIMESTAMP}: deploying group ${MY_GROUP_NAME}"
 
     if [ -z MY_GROUP_NAME ];then
         log_and_echo "$ERROR" "No container name was provided"
@@ -200,7 +203,8 @@ deploy_group() {
     fi
 
     # create the group and check the results
-    log_and_echo "creating group: $IC_COMMAND group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
+    TIMESTAMP = `date`
+    log_and_echo "${TIMESTAMP}: creating group: $IC_COMMAND group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
     ice_retry group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
     local RESULT=$?
     if [ $RESULT -ne 0 ]; then
@@ -221,7 +225,8 @@ deploy_group() {
                 map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
                 RET=$?
                 if [ $RET -eq 0 ]; then
-                    log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
+                    TIMESTAMP = `date`
+                    log_and_echo "${TIMESTAMP}: Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
                 else
                     if [ "${DEBUG}x" != "1x" ]; then
                         log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
@@ -278,7 +283,8 @@ deploy_simple () {
 }
 
 deploy_red_black () {
-    log_and_echo "$LABEL" "Example red_black container deploy "
+    local TIMESTAMP = `date`
+    log_and_echo "${TIMESTAMP}: $LABEL" "Example red_black container deploy "
     # deploy new version of the application
     local MY_GROUP_NAME="${CONTAINER_NAME}_${BUILD_NUMBER}"
     deploy_group ${MY_GROUP_NAME}
@@ -302,7 +308,8 @@ deploy_red_black () {
 }
 
 clean() {
-    log_and_echo "Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
+    local TIMESTAMP = `date`
+    log_and_echo "${TIMESTAMP}: Cleaning up previous deployments.  Will keep ${CONCURRENT_VERSIONS} versions active."
     local RESULT=0
     local FIND_PREVIOUS="false"
     local groupName=""
@@ -333,6 +340,7 @@ clean() {
     # loop through the array of the group name and check which one it need to keep
     for groupName in ${GROUP_NAME_ARRAY[@]}
     do
+        date
         GROUP_VERSION_NUMBER=$(echo $groupName | sed 's#.*_##g')
         if [ $GROUP_VERSION_NUMBER -gt $BUILD_NUMBER ]; then
             log_and_echo "$WARN" "The group ${groupName} version is greater then the current build number ${BUILD_NUMBER} and it will not be removed."
@@ -361,9 +369,11 @@ clean() {
             fi
              FIND_PREVIOUS="true"
         else
-            log_and_echo "delete inventory: ${groupName}"
+            TIMESTAMP = `date`
+            log_and_echo "${TIMESTAMP}: delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
-            log_and_echo "removing group ${groupName}"
+            TIMESTAMP = `date`
+            log_and_echo "${TIMESTAMP}: removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
@@ -375,10 +385,11 @@ clean() {
         fi
 
     done
+    TIMESTAMP = `date`
     if [ FIND_PREVIOUS="false" ]; then
-        log_and_echo "No previous deployments found to clean up"
+        log_and_echo "${TIMESTAMP}: No previous deployments found to clean up"
     else
-        log_and_echo "Cleaned up previous deployments"
+        log_and_echo "${TIMESTAMP}: Cleaned up previous deployments"
     fi
     return 0
 }

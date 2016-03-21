@@ -117,7 +117,7 @@ map_url_route_to_container_group (){
                     ROUTE_PROGRESS=$(grep "\"in_progress\":" iceretry.log | awk '{print $2}' | sed 's/.$//')
                     ROUTE_SUCCESSFUL=$(grep "\"successful\":" iceretry.log | awk '{print $2}')
                     log_and_echo "Router status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
-                    if [ "${ROUTE_PROGRESS}" == "false" ] && [ "${ROUTE_SUCCESSFUL}" == "true" ]; then
+                    if [ "${ROUTE_PROGRESS}" == "false" ]; then
                         break
                     fi    
                 else

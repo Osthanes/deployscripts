@@ -230,9 +230,9 @@ deploy_group() {
     fi
 
     # if group wait for unmap time doesn't exist,
-    # default to 6 minutes
+    # default to 3 minutes
     if [ -z "$GROUP_WAIT_UNMAP_TIME" ]; then
-        export GROUP_WAIT_UNMAP_TIME=360
+        export GROUP_WAIT_UNMAP_TIME=180
     fi
 
     # create the group and check the results

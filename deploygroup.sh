@@ -388,7 +388,7 @@ clean() {
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
             if [ $GROUP_WAIT_UNMAP_TIME -gt 0 ]; then
-                log_and_echo "sleeping to allow route unmap to take effect"
+                log_and_echo "Sleeping $GROUP_WAIT_UNMAP_TIME to allow route unmap to take effect before removing old group. This is to avoid 502 errors from stale containers on the unmapped route. To skip this, at risk of 502 errors, change the env var GROUP_WAIT_UNMAP_TIME to a lower time, or 0 to skip the wait."
                 sleep $GROUP_WAIT_UNMAP_TIME
             fi
             log_and_echo "removing group ${groupName}"

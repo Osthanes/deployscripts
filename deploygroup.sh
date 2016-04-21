@@ -229,6 +229,12 @@ deploy_group() {
         fi
     fi
 
+    # if group wait for unmap time doesn't exist,
+    # default to 3 minutes
+    if [ -z "$GROUP_WAIT_UNMAP_TIME" ]; then
+        export GROUP_WAIT_UNMAP_TIME=180
+    fi
+
     # create the group and check the results
     log_and_echo "creating group: $IC_COMMAND group create --name ${MY_GROUP_NAME} ${BIND_PARMS} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}"
     ice_retry group create --name ${MY_GROUP_NAME} ${PUBLISH_PORT} ${MEMORY} ${OPTIONAL_ARGS} ${BIND_PARMS} --desired ${DESIRED_INSTANCES} --min ${MIN_INSTANCES} --max ${MAX_INSTANCES} ${AUTO} ${IMAGE_NAME}
@@ -381,6 +387,10 @@ clean() {
             sleep 2
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
+            if [ $GROUP_WAIT_UNMAP_TIME -gt 0 ]; then
+                log_and_echo "Sleeping $GROUP_WAIT_UNMAP_TIME to allow route unmap to take effect before removing old group. This is to avoid 502 errors from stale containers on the unmapped route. To skip this, at risk of 502 errors, change the env var GROUP_WAIT_UNMAP_TIME to a lower time, or 0 to skip the wait."
+                sleep $GROUP_WAIT_UNMAP_TIME
+            fi
             log_and_echo "removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?

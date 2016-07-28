@@ -64,6 +64,17 @@ wait_for_group (){
     return 1
 }
 
+# function to get all configured hostnames for mapping, this is a union of ROUTE_HOSTNAME and ADDITIONAL_HOSTNAMES
+# sets the ALLHOSTS global variable with the array of hostnames
+get_routes () {
+    ALLHOSTS=(${ROUTE_HOSTNAME})
+    if [[ ( -n "${ADDITIONAL_HOSTNAMES}" ) && ( "${ADDITIONAL_HOSTNAMES}" != "None" ) ]]; then
+        for host in $(echo ${ADDITIONAL_HOSTNAMES} | tr "," " "); do
+            ALLHOSTS+=(${host})
+        done
+    fi
+}
+
 # function to map url route the container group
 # takes a MY_GROUP_NAME, ROUTE_HOSTNAME and ROUTE_DOMAIN as the parameters
 map_url_route_to_container_group (){
@@ -254,23 +265,26 @@ deploy_group() {
         if [ -z "${IGNORE_MAPPING_ROUTE}" ]; then
             # Map route the container group
             if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
-                map_url_route_to_container_group ${MY_GROUP_NAME} ${ROUTE_HOSTNAME} ${ROUTE_DOMAIN}
-                RET=$?
-                if [ $RET -eq 0 ]; then
-                    log_and_echo "Successfully mapped '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
-                else
-                    if [ "${DEBUG}x" != "1x" ]; then
-                        log_and_echo "$WARN" "You can check the route status with 'curl ${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}' command after the deploy completed."
+                get_routes
+                for host in ${ALLHOSTS[@]}; do
+                    map_url_route_to_container_group ${MY_GROUP_NAME} ${host} ${ROUTE_DOMAIN}
+                    RET=$?
+                    if [ $RET -eq 0 ]; then
+                        log_and_echo "Successfully mapped '$host.$ROUTE_DOMAIN' URL to container group '$MY_GROUP_NAME'."
                     else
-                        log_and_echo "$ERROR" "Failed to map '$ROUTE_HOSTNAME.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
+                        if [ "${DEBUG}x" != "1x" ]; then
+                            log_and_echo "$WARN" "You can check the route status with 'curl ${host}.${ROUTE_DOMAIN}' command after the deploy completed."
+                        else
+                            log_and_echo "$ERROR" "Failed to map '$host.$ROUTE_DOMAIN' to container group '$MY_GROUP_NAME'. Please ensure that the routes are setup correctly.  You can see this with cf routes when targetting the space for this stage."
+                        fi
                     fi
-                fi
-                if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
-                    TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
-                    echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
-                    echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
-                    echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
-                fi
+                    if [ ! -z ${DEPLOY_PROPERTY_FILE} ]; then
+                        TEST_URL="${ROUTE_HOSTNAME}.${ROUTE_DOMAIN}"
+                        echo "export TEST_URL="${TEST_URL}"" >> "${DEPLOY_PROPERTY_FILE}"
+                        echo "export TEST_IP="${ROUTE_HOSTNAME}"" >> "${DEPLOY_PROPERTY_FILE}"
+                        echo "export TEST_PORT="$(echo $PORT | sed 's/,/ /g' |  awk '{print $1;}')"" >> "${DEPLOY_PROPERTY_FILE}"
+                    fi
+                done
             else
                 log_and_echo "$ERROR" "No route defined to be mapped to the container group.  If you wish to provide a Route please define ROUTE_HOSTNAME and ROUTE_DOMAIN on the Stage environment."
             fi
@@ -378,13 +392,16 @@ clean() {
             log_and_echo "keeping deployment: ${groupName}"
         elif [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) ]]; then
             # unmap router and remove the group
-            log_and_echo "removing route $ROUTE_HOSTNAME $ROUTE_DOMAIN from ${groupName}"
-            ice_retry route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}
-            RESULT=$?
-            if [ $RESULT -ne 0 ]; then
-                log_and_echo "$WARN" "'$IC_COMMAND route unmap --hostname $ROUTE_HOSTNAME --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
-            fi
-            sleep 2
+            get_routes
+            for host in ${ALLHOSTS[@]}; do
+                log_and_echo "removing route $host $ROUTE_DOMAIN from ${groupName}"
+                ice_retry route unmap --hostname $host --domain $ROUTE_DOMAIN ${groupName}
+                RESULT=$?
+                if [ $RESULT -ne 0 ]; then
+                    log_and_echo "$WARN" "'$IC_COMMAND route unmap --hostname $host --domain $ROUTE_DOMAIN ${groupName}' command failed with return code ${RESULT}"
+                fi
+                sleep 2
+            done
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
             if [ $GROUP_WAIT_UNMAP_TIME -gt 0 ]; then

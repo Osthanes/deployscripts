@@ -364,7 +364,7 @@ clean() {
                 # does it have a public IP address
                 if [ -z "${FLOATING_IP}" ]; then
                     if [ "$USE_ICE_CLI" != "1" ] && [ $CONTAINER_VERSION_NUMBER -eq $BUILD_NUMBER ]; then
-                        log_and_echo "Did not search for previous IP because the cuntainer build number $CONTAINER_VERSION_NUMBER is the current build number"
+                        log_and_echo "Did not search for previous IP because the container build number $CONTAINER_VERSION_NUMBER is the current build number"
                     else
                         FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
                         temp="${FLOATING_IP%\"}"

@@ -530,7 +530,7 @@ check_image() {
             else
                 for VER in ${VERSION_LIST[@]} 
                 do 
-                    if [ $VER -eq $IMAGE_VERSION ]; then 
+                    if [ "$VER" == "$IMAGE_VERSION" ]; then 
                         return 0
                     fi
                 done  

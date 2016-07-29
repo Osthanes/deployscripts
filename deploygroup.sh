@@ -59,7 +59,9 @@ wait_for_group (){
         fi
         sleep 3
     done
-    log_and_echo "$ERROR" "Failed to start group"
+    local temp="${STATUS%\"}"
+    STATUS="${temp#\"}"
+    log_and_echo "$ERROR" "Create group is not completed and stays in status '${STATUS}'"
     return 1
 }
 
@@ -104,12 +106,40 @@ map_url_route_to_container_group (){
         log_and_echo "${TIMESTAMP}: map route to container group: $IC_COMMAND route map --hostname ${HOSTNAME} --domain $DOMAIN $GROUP_NAME"
         ice_retry route map --hostname $HOSTNAME --domain $DOMAIN $GROUP_NAME
         RESULT=$?
-        if [ -z "${VALIDATE_ROUTE}" ]; then
-            VALIDATE_ROUTE=0
-            log_and_echo "To validate route using curl, set VALIDATE_ROUTE to 1 in the stage environment variables"
-        fi
         if [ $RESULT -eq 0 ]; then
-            # loop until the route to container group success with retun code under 400 or time-out.
+            # check route status
+            local COUNT=0
+            local ROUTE_PROGRESS=""
+            local ROUTE_SUCCESSFUL=""
+            while [[ ( $COUNT -lt 180 ) ]]; do
+                let COUNT=COUNT+1
+                ice_retry_save_output group inspect ${GROUP_NAME} 2> /dev/null
+                RESULT=$?
+                if [ $RESULT -eq 0 ]; then
+                    ROUTE_PROGRESS=$(grep "\"in_progress\":" iceretry.log | awk '{print $2}' | sed 's/.$//')
+                    ROUTE_SUCCESSFUL=$(grep "\"successful\":" iceretry.log | awk '{print $2}')
+                    log_and_echo "Router status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
+                    if [ "${ROUTE_PROGRESS}" == "false" ]; then
+                        break
+                    fi    
+                else
+                    log_and_echo "$IC_COMMAND group inspect ${GROUP_NAME} failed, try again." 
+                fi
+                sleep 3
+            done
+            if [ "${ROUTE_PROGRESS}" != "false" ] && [ "${ROUTE_SUCCESSFUL}" != "true" ]; then
+                log_and_echo "$ERROR" "Failed to route map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."
+                log_and_echo "$ERROR" "Router status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
+                return 1
+            else
+                log_and_echo "Successfully map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."    
+            fi
+
+             # loop until the route to container group success with retun code under 400 or time-out.
+            if [ -z "${VALIDATE_ROUTE}" ]; then
+                VALIDATE_ROUTE=0
+                log_and_echo "To validate route using curl, set VALIDATE_ROUTE to 1 in the stage environment variables"
+            fi
             if [ "$VALIDATE_ROUTE" -ne "0" ]; then
                 local COUNTER=0
                 local RESPONSE="0"
@@ -200,6 +230,12 @@ deploy_group() {
         else
             BIND_PARMS="-e CCS_BIND_APP=${BIND_TO}"
         fi
+    fi
+
+    # if group wait for unmap time doesn't exist,
+    # default to 3 minutes
+    if [ -z "$GROUP_WAIT_UNMAP_TIME" ]; then
+        export GROUP_WAIT_UNMAP_TIME=180
     fi
 
     # create the group and check the results
@@ -359,6 +395,10 @@ clean() {
             sleep 2
             log_and_echo "delete inventory: ${groupName}"
             delete_inventory "ibm_containers_group" ${groupName}
+            if [ $GROUP_WAIT_UNMAP_TIME -gt 0 ]; then
+                log_and_echo "Sleeping $GROUP_WAIT_UNMAP_TIME to allow route unmap to take effect before removing old group. This is to avoid 502 errors from stale containers on the unmapped route. To skip this, at risk of 502 errors, change the env var GROUP_WAIT_UNMAP_TIME to a lower time, or 0 to skip the wait."
+                sleep $GROUP_WAIT_UNMAP_TIME
+            fi
             log_and_echo "removing group ${groupName}"
             ice_retry group rm ${groupName}
             RESULT=$?
@@ -383,10 +423,9 @@ clean() {
             fi
             FIND_PREVIOUS="true"
         fi
-
     done
     TIMESTAMP=`date`
-    if [ FIND_PREVIOUS="false" ]; then
+    if [ "${FIND_PREVIOUS}" == "false" ]; then
         log_and_echo "${TIMESTAMP}: No previous deployments found to clean up"
     else
         log_and_echo "${TIMESTAMP}: Cleaned up previous deployments"

@@ -202,11 +202,7 @@ deploy_red_black () {
         if [ -z "${FLOATING_IP}" ];then
             log_and_echo "No any free IP address found. Requesting new IP"
             ice_retry_save_output ip request 2> /dev/null
-            if [ "$USE_ICE_CLI" = "1" ]; then
-                FLOATING_IP=$(awk '{print $4}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
-            else
-                FLOATING_IP=$(awk '{print $3}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
-            fi
+            FLOATING_IP=$(awk '{print $4}' iceretry.log | grep -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
             RESULT=$?
             if [ $RESULT -ne 0 ]; then
                 cat iceretry.log
@@ -339,9 +335,9 @@ clean() {
     done
     # add the current containers in an array of the container name
     if [ "$USE_ICE_CLI" = "1" ]; then
-        ice_retry_save_output ps -q 2> /dev/null
+        ice_retry_save_output ps -q -a 2> /dev/null
     else
-        ice_retry_save_output ps 2> /dev/null
+        ice_retry_save_output ps -a 2> /dev/null
     fi   
     RESULT=$?
     if [ $RESULT -ne 0 ]; then

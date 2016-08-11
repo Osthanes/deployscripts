@@ -266,6 +266,11 @@ deploy_group() {
             # Map route the container group
             if [[ ( -n "${ROUTE_DOMAIN}" ) && ( -n "${ROUTE_HOSTNAME}" ) && ( "$ROUTE_HOSTNAME" != "None" ) ]]; then
                 get_routes
+                # Conditionally sleep between group completion and route mapping
+                if [[ ( -n "${GROUP_PRE_ROUTE_WAIT_TIME}" ) && ( ${GROUP_PRE_ROUTE_WAIT_TIME} -gt 0 ) ]]; then
+                    log_and_echo "Sleeping ${GROUP_PRE_ROUTE_WAIT_TIME} seconds before mapping route(s) to the newly created group."
+                    sleep ${GROUP_PRE_ROUTE_WAIT_TIME}
+                fi
                 for host in ${ALLHOSTS[@]}; do
                     map_url_route_to_container_group ${MY_GROUP_NAME} ${host} ${ROUTE_DOMAIN}
                     RET=$?

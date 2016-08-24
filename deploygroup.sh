@@ -485,10 +485,10 @@ fi
 
 check_num='^[0-9]+$'
 if [ -z "$MAX_INSTANCES" ]; then
-    export MAX_INSTANCES=10
+    export MAX_INSTANCES=6
 elif ! [[ "$MAX_INSTANCES" =~ $check_num ]] ; then
-    log_and_echo "$WARN" "MAX_INSTANCES value is not a number, defaulting to 10 and continuing deploy process."
-    export MAX_INSTANCES=10
+    log_and_echo "$WARN" "MAX_INSTANCES value is not a number, defaulting to 6 and continuing deploy process."
+    export MAX_INSTANCES=6
 fi
 
 if [ $MAX_INSTANCES -lt $DESIRED_INSTANCES ]; then

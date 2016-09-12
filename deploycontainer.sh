@@ -441,6 +441,8 @@ ${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} container dep
 
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
+elif [ "${DEPLOY_TYPE}" == "simple" ]; then
+    deploy_simple
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then
     clean
 else

@@ -248,36 +248,7 @@ clean() {
     local FIND_PREVIOUS="false"
     local FLOATING_IP=""
     local IP_JUST_FOUND=""
-    local NEW_DISCOVERED_IP=""
     local containerName=""
-    if [ "$USE_ICE_CLI" != "1" ]; then
-        # if the IC_COMMAND is cf ic, then it need to use discovered public IP address
-        log_and_echo "Check if it is already discovered a PublicIpAddress during run container ${CONTAINER_NAME}_${BUILD_NUMBER}"
-        local RC=0
-        local retries=0
-        while [ $retries -lt 6 ]; do
-            sleep 10
-            ice_retry_save_output inspect ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
-            RESULT=$?
-            if [ $RESULT -eq 0 ]; then
-                local FOUND_FLOATING_IP=$(grep "PublicIpAddress" iceretry.log | awk '{print $2}')
-                temp="${FOUND_FLOATING_IP%\"}"
-                FOUND_FLOATING_IP="${temp#\"}"
-                if [ -n "${FOUND_FLOATING_IP}" ]; then
-                    NEW_DISCOVERED_IP=${FOUND_FLOATING_IP}
-                    log_and_echo "New discovered ip is ${NEW_DISCOVERED_IP}"
-                    break
-                else
-                    log_and_echo "$WARN" "no any PublicIpAddress discovered for ${CONTAINER_NAME}_${BUILD_NUMBER}, Sleep 10 sec and try again."
-                fi
-            else
-               log_and_echo "$WARN" "'$IC_COMMAND inspect ${CONTAINER_NAME}_${BUILD_NUMBER}' command failed with return code ${RESULT}" 
-               log_and_echo "$DEBUGGING" `cat iceretry.log`
-               break
-            fi
-            retries=$(( $retries + 1 ))
-        done
-    fi
     # if we have a requested floating ip, try to use that one instead of any other
     if [ -n "${REQUESTED_FLOATING_IP}" ]; then
         # make sure we own this ip
@@ -303,16 +274,6 @@ clean() {
                         log_and_echo "Requested ip ${REQUESTED_FLOATING_IP} was successfully unbound from previous container ${old_bound_container}"
                     fi
                     # sleep to let it take effect
-                    sleep 2
-                fi
-                if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
-                    ice_retry ip release ${NEW_DISCOVERED_IP} 2> /dev/null
-                    RESULT=$?
-                    if [ $RESULT -eq 0 ]; then
-                        log_and_echo "The new discovered ip ${NEW_DISCOVERED_IP} was successfully release"
-                    else
-                        log_and_echo "$ERROR" "'$IC_COMMAND ip release ${NEW_DISCOVERED_IP}' command failed with return code ${RESULT}"
-                    fi
                     sleep 2
                 fi
                 # bind it to our new container
@@ -392,16 +353,6 @@ clean() {
                         return 0
                     fi   
                     sleep 2                    
-                    if [ "$USE_ICE_CLI" != "1" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
-                        ice_retry ip release ${NEW_DISCOVERED_IP} 2> /dev/null
-                        RESULT=$?
-                        if [ $RESULT -eq 0 ]; then
-                            log_and_echo "The new discovered ip ${NEW_DISCOVERED_IP} was successfully release"
-                        else
-                            log_and_echo "$ERROR" "'$IC_COMMAND ip release ${NEW_DISCOVERED_IP}' command failed with return code ${RESULT}"
-                        fi
-                        sleep 2
-                    fi
                     ice_retry ip bind ${FLOATING_IP} ${CONTAINER_NAME}_${BUILD_NUMBER} 2> /dev/null
                     RESULT=$?
                     if [ $RESULT -ne 0 ]; then
@@ -437,9 +388,6 @@ clean() {
         log_and_echo "No previous deployments found to clean up"
     else
         log_and_echo "Cleaned up previous deployments"
-    fi
-    if [ "$USE_ICE_CLI" != "1" ] && [ -z "${FLOATING_IP}" ] && [ -n "${NEW_DISCOVERED_IP}" ]; then
-        FLOATING_IP=$NEW_DISCOVERED_IP
     fi
     if [ -n "${FLOATING_IP}" ]; then
        log_and_echo "Discovered previous IP ${FLOATING_IP}"
@@ -493,6 +441,8 @@ ${EXT_DIR}/utilities/sendMessage.sh -l info -m "New ${DEPLOY_TYPE} container dep
 
 if [ "${DEPLOY_TYPE}" == "red_black" ]; then
     deploy_red_black
+elif [ "${DEPLOY_TYPE}" == "simple" ]; then
+    deploy_simple
 elif [ "${DEPLOY_TYPE}" == "clean" ]; then
     clean
 else

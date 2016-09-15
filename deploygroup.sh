@@ -42,7 +42,7 @@ wait_for_group (){
     local STATUS="unknown"
     while [[ ( $COUNTER -lt 180 ) ]]; do
         let COUNTER=COUNTER+1
-        STATUS=$($IC_COMMAND group inspect $WAITING_FOR | grep "Status" | awk '{print $2}' | sed 's/,//g')
+        STATUS=$($IC_COMMAND group inspect $WAITING_FOR | grep -w "Status" | awk '{print $2}' | sed 's/,//g')
         if [ -z "${STATUS}" ] && [ "$USE_ICE_CLI" = "1" ]; then
             # get continer status: attribute="Name", value=${WAITING_FOR}, search_attribute="Status"
             get_container_group_value_for_given_attribute "Name" ${WAITING_FOR} "Status"

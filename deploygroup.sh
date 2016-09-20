@@ -53,8 +53,6 @@ wait_for_group (){
             return 0
         elif [[ "${STATUS}" =~ "FAILED" ]]; then
             return 2
-        elif [ "${STATUS}" == "FAILED" ] || [ "${STATUS}" == "\"FAILED\"" ]; then
-            return 3
         fi
         sleep 3
     done

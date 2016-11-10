@@ -125,7 +125,7 @@ map_url_route_to_container_group (){
                 if [ $RESULT -eq 0 ]; then
                     ROUTE_PROGRESS=$(grep "\"in_progress\":" iceretry.log | awk '{print $2}' | sed 's/.$//')
                     ROUTE_SUCCESSFUL=$(grep "\"successful\":" iceretry.log | awk '{print $2}')
-                    log_and_echo "Router status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
+                    log_and_echo "Route status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
                     if [ "${ROUTE_PROGRESS}" == "false" ]; then
                         break
                     fi    
@@ -134,12 +134,12 @@ map_url_route_to_container_group (){
                 fi
                 sleep 3
             done
-            if [ "${ROUTE_PROGRESS}" != "false" ] && [ "${ROUTE_SUCCESSFUL}" != "true" ]; then
-                log_and_echo "$ERROR" "Failed to route map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."
-                log_and_echo "$ERROR" "Router status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
+            if [ "${ROUTE_PROGRESS}" != "false" ] || [ "${ROUTE_SUCCESSFUL}" != "true" ]; then
+                log_and_echo "$ERROR" "Failed to map route $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."
+                log_and_echo "$ERROR" "Route status: 'in_progress': '${ROUTE_PROGRESS}', 'successful': '${ROUTE_SUCCESSFUL}'"
                 return 1
             else
-                log_and_echo "Successfully map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."    
+                log_and_echo "Successfully mapped $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."    
             fi
 
              # loop until the route to container group success with retun code under 400 or time-out.

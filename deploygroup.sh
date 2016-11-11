@@ -179,7 +179,7 @@ map_url_route_to_container_group (){
                 fi
             fi
         else
-            log_and_echo "$ERROR" "Failed to route map $HOSTNAME.$DOMAIN to $MY_GROUP_NAME."
+            log_and_echo "$ERROR" "Failed to map route $HOSTNAME.$DOMAIN to group $MY_GROUP_NAME."
             cf routes
             return 1
         fi

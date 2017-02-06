@@ -494,7 +494,7 @@ update_inventory(){
     IDS_RESOURCE=$CF_SPACE_ID
     if [ -z "$IDS_RESOURCE" ]; then
         log_and_echo "$ERROR" "Could not find CF SPACE in environment, using production space id"
-    elif [ ! -z "$IDS_PIPELINE_API_URL"]; then
+    elif [ ! -z "$IDS_PIPELINE_API_URL" ]; then
         # call IBM DevOps Service V2 Inventory CLI to update the entry for this deployment
         log_and_echo "bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -p $IDS_PIPELINE_API_URL -v $IDS_VERSION"
         bash ids-inv -a ${ACTION} -d $IDS_DEPLOYER -q $IDS_REQUEST -r $IDS_RESOURCE -s $ID -t ${TYPE} -p $IDS_PIPELINE_API_URL -v $IDS_VERSION

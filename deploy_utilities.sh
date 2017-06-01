@@ -264,7 +264,7 @@ check_memory_quota() {
     if [ -z "$MEMORY_LIMIT" ] || [ -z "$MEMORY_USAGE" ]; then
         echo -e "${red}MEMORY_LIMIT or MEMORY_USAGE value is missing from $IC_COMMAND info output command. Defaulting to m1.tiny (256 MB memory) and continuing deploy process.${no_color}" >&2
     else
-        if [ $(echo "$MEMORY_LIMIT - $MEMORY_USAGE" | bc) -lt $NEW_MEMORY ]; then
+        if [ $((MEMORY_LIMIT - MEMORY_USAGE)) -lt $NEW_MEMORY ]; then
             return 1
         fi
     fi
@@ -371,7 +371,7 @@ dump_info () {
     if [ ! -z ${MEMORY_LIMIT} ]; then
         if [ ${MEMORY_LIMIT} -ge 0 ]; then
             export MEMORY_USAGE=$(echo "$ICEINFO" | grep -i "Memory Usage" | awk '{print $NF}')
-            local MEM_WARNING_LEVEL="$(echo "$MEMORY_LIMIT - 512" | bc)"
+            local MEM_WARNING_LEVEL=$((MEMORY_LIMIT - 512))
 
             if [ ${MEMORY_USAGE} -ge ${MEMORY_LIMIT} ]; then
                 log_and_echo "$ERROR" "You are using ${MEMORY_USAGE} MB of memory, and may have reached the default limit for memory used "
